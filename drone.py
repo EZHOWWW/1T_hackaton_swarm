@@ -22,7 +22,7 @@ class GoToFireplace(GoToTask):
 
 
 class GoToHome(GoToTask):
-    def __init__(self, home_pos=GoToHome.home_pos):
+    def __init__(self, home_pos):
         super().__init__(home_pos)
 
 
