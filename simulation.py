@@ -5,6 +5,7 @@ from geometry import Vector
 
 @dataclass
 class Fireplace:
+    number: int
     possition: Vector = Vector()
     active: bool = False
 
@@ -12,31 +13,24 @@ class Fireplace:
 @dataclass
 class DroneInfo:
     possition: Vector = Vector()
-    velocity: tuple[float, float, float] = (
-        0.0,
-        0.0,
-        0.0,
-    ) 
+    velocity: Vector = Vector()
     angle: tuple[float, float, float] = (
         0.0,
         0.0,
         0.0,
-    ) 
+    )
     angular_velocity: tuple[float, float, float] = (
         0.0,
         0.0,
         0.0,
     )
-    lidars: tuple[float, ...] = tuple(
-        [0] * 10
-    )  # len = 10
+    lidars: tuple[float, ...] = tuple([0] * 10)  # len = 10
     is_alive: bool = True
 
 
 class Simulation:
     def __init__(self):
         self.connect_to_server()
-        self.fireplaces = None
 
     def connect_to_server(self):
         pass

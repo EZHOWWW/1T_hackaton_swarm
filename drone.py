@@ -1,6 +1,7 @@
 import asyncio
-from simulation import Simulation
+from simulation import Simulation, Fireplace
 from abc import ABC
+from swarm import Swarm
 
 
 class Task(ABC):
@@ -37,11 +38,12 @@ class DroneExecutor:
 
 
 class Drone:
-    def __init__(self, number: int, sim: Simulation):
+    def __init__(self, number: int, sim: Simulation, swarm: Swarm):
         self.active = True
         self.number = number
         self.executor = DroneExecutor(sim)
         self.sim = sim
+        self.swarm = swarm
         self.task = FindFireplace()
 
     def start(self):
@@ -54,3 +56,10 @@ class Drone:
                 pass
             case GoToTask:
                 pass
+
+    def find_fireplace(self, fireplaces: list[tuple(Fireplace, int)]) -> int:
+        """
+        get list(Fireplace(pos, active), drone number which work on in)
+        return number Fireplace which we choose
+        """
+        pass
