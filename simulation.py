@@ -1,14 +1,17 @@
 from dataclasses import dataclass
 
+from geometry import Vector
+
+
 @dataclass
 class Fireplace:
-    possition: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    possition: Vector = Vector()
     active: bool = False
 
 
 @dataclass
 class DroneInfo:
-    possition: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    possition: Vector = Vector()
     velocity: tuple[float, float, float] = (
         0.0,
         0.0,
