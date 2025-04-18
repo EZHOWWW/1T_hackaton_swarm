@@ -1,17 +1,33 @@
 from dataclasses import dataclass
 
-
 @dataclass
 class Fireplace:
-    possition: tuple[float] = tuple()  # len =  3
+    possition: tuple[float, float, float] = (0.0, 0.0, 0.0)
     active: bool = False
 
 
 @dataclass
 class DroneInfo:
-    possition: tuple[float] = tuple()  # len = 3
-    lidars: tuple[float] = tuple()  # len = 10
-    angle: tuple[float] = tuple()  # len 3
+    possition: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    velocity: tuple[float, float, float] = (
+        0.0,
+        0.0,
+        0.0,
+    ) 
+    angle: tuple[float, float, float] = (
+        0.0,
+        0.0,
+        0.0,
+    ) 
+    angular_velocity: tuple[float, float, float] = (
+        0.0,
+        0.0,
+        0.0,
+    )
+    lidars: tuple[float, ...] = tuple(
+        [0] * 10
+    )  # len = 10
+    is_alive: bool = True
 
 
 class Simulation:
@@ -28,5 +44,5 @@ class Simulation:
     def get_drone_info(self, n: int) -> DroneInfo:
         return DroneInfo()
 
-    def set_drone_motors(self, n: int, motors: tuple[float]):
+    def set_drone(self, n: int, motors: tuple[float], drop: bool = False):
         pass
