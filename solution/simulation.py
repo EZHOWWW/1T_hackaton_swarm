@@ -14,6 +14,7 @@ class Fireplace:
 
 @dataclass
 class DroneInfo:
+    id: int = -1
     possition: Vector = Vector()
     velocity: Vector = Vector()
     angle: tuple[float, float, float] = (
@@ -26,40 +27,68 @@ class DroneInfo:
         0.0,
         0.0,
     )
-    lidars: tuple[float, ...] = tuple([0] * 10)  # len = 10
+    lidars: dict[str, list[float]] = None  # len = 10
     is_alive: bool = True
+
+
+def parse_drone_data(i: dict) -> DroneInfo:
+    def parse_vector(v: dict) -> tuple[float, float, float]:
+        return (v["x"], v["y"], v["z"])
+
+    return DroneInfo(
+        i["id"],
+        Vector(*parse_vector(i["droneVector"])),
+        Vector(*parse_vector(i["linearVelocity"])),
+        parse_vector(i["droneAxisRotation"]),
+        parse_vector(i["angularVelocity"]),
+        i["lidarInfo"],
+        not i["isDroneCrushed"],
+    )
 
 
 class Simulation:
     def __init__(self):
+        self.connection = SocketConnection()
+        self.fireplaces = None
+        self.last_drones_info = None
+        self.last_engines = None
+        self.can_get_drones_info = False
         print("init")
 
     async def connect_to_server(self):
-        self.connection = SocketConnection()
         await self.connection.set_connection()
 
     def get_fireplaces_info(self) -> list[Fireplace]:
-        res = [
-            Fireplace(i, Vector(v["x"], v["y"], v["z"]))
-            for i, v in enumerate(
-                json.loads(self.connection.receive_data())["firesPositions"]
-            )
+        if self.fireplaces is None:
+            self.fireplaces = [
+                Fireplace(i, Vector(v["x"], v["y"], v["z"]))
+                for i, v in enumerate(
+                    json.loads(self.connection.receive_data())["firesPositions"]
+                )
+            ]
+
+        return self.fireplaces
+
+    def get_drones_info(self) -> list[DroneInfo]:
+        if self.last_drones_info is None:
+            self.set_drones([[0] * 8] * 5)
+        if not self.can_get_drones_info:
+            self.set_drones(self.last_engines)
+        res = json.loads(self.connection.receive_data())["dronesData"]
+        self.last_drones_info = [parse_drone_data(i) for i in res]
+        self.can_get_drones_info = False
+
+        return self.last_drones_info
+
+    def set_drones(self, engines: list[list[float]], drop: list[bool] = [False] * 8):
+        """engines in [0, 1]"""
+        self.last_engines = engines
+        eng = [
+            concat_engine([e * 100 for e in v], {"id": i}, drop[i])
+            for i, v in enumerate(engines)
         ]
-        return res
-
-    def get_drone_info(self, n: int) -> DroneInfo:
-        # print(self.connection.send_data("0"))
-        # print(self.connection.receive_data())
-        # print(self.connection.receive_data())
-        print(
-            self.connection.send_data(
-                concat_engines(concat_engine([0 for _ in range(8)], {"id": 0}), 0)
-            )
-        )
-        return DroneInfo()
-
-    def set_drone(self, n: int, motors: tuple[float], drop: bool = False):
-        pass
+        self.connection.send_data(concat_engines(eng, 0.1))
+        self.can_get_drones_info = True
 
     def close_connection(self):
         print("close")
