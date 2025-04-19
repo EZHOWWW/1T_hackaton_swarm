@@ -33,11 +33,11 @@ class Vector:
 
     def __mod__(self, other):
         """Скалярное произведение"""
-        return dot(other)
+        return self.dot(other)
 
     def __pow__(self, other):
         """Векторное произведение"""
-        return cross(other)
+        return self.cross(other)
 
     def length(self):
         """Длина вектора"""
@@ -58,3 +58,12 @@ class Vector:
 
     def __neg__(self):
         return Vector(-self.x, -self.y, -self.z)
+
+    def replace(self, **kwargs):
+        if "x" in kwargs:
+            self.x = kwargs["x"]
+        if "y" in kwargs:
+            self.y = kwargs["y"]
+        if "z" in kwargs:
+            self.z = kwargs["z"]
+        return self

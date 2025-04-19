@@ -1,7 +1,8 @@
 import asyncio
-from solution.simulation import Simulation, Fireplace
+from solution.simulation import Simulation, Fireplace, DroneInfo
 from abc import ABC
 from solution.geometry import Vector
+from solution.executor import DroneExecutor
 
 
 class Task(ABC):
@@ -31,87 +32,76 @@ class GoToHome(GoToTask):
         super().__init__(home_pos)
 
 
-class DroneExecutor:
-    def __init__(self, drone):
-        self.drone = drone
-        self.engine_possition_ration = t = 0.25
-        z = 1 - (t**2 + (1 - t) ** 2)  # vector len = 1
-        self.engines_vector_effect = [
-            Vector(t, 1 - t, z),  # 1 fr
-            Vector(-t, 1 - t, z),  # 2 fl
-            -Vector(-t, 1 - t, z),  # 3 br
-            -Vector(t, 1 - t, z),  # 4 bl
-            Vector(1 - t, t, z),  # 5 rf
-            Vector(1 - t, -t, z),  # 6 rb
-            -Vector(1 - t, -t, z),  # 7 lf
-            -Vector(1 - t, t, z),  # 8 lb
-        ]
-        self.desired_speed = Vector()
-
-    def engines_for_speed(self, desired_speed: Vector = Vector()) -> list[float]:
-        from numpy import clip
-
-        self.desired_speed = desired_speed
-
-        engines = [0] * 8
-        for i, v in enumerate(self.engines_vector_effect):
-            engines[i] = self.desired_speed.dot(v)
-        # if < 0 need up other engine
-        return clip(engines, 0, 1)
+DISTANCE_TO_DROP = 1
 
 
 class Drone:
-    def __init__(self, id: int, sim: Simulation, swarm):
-        self.active = True
-        self.id = id
+    def __init__(self, sim: Simulation, swarm):
         self.executor = DroneExecutor(self)
         self.sim = sim
         self.swarm = swarm
-        self.task = FindFireplace()
+        self.task: Task = FindFireplace()
         # Main params
-        self.params = None
-        self.engines = None
-        self.need_drop = False
+        self.params: DroneInfo = None
+        self.engines: list[float] = [0.0] * 8
+        self.need_drop: bool = False
 
-    def update(self):
+    def update(self, dt: float):
         """now self.params and self.engines is actual"""
-        print(self.params)
-        print(self.engines)
-        print()
+        self.solve_task(self.task, dt)
+        self.log()
 
+    def solve_task(self, task: Task, dt: float):
         if isinstance(self.task, FindFireplace):
             pos = self.find_fireplace(self.swarm.fireplaces)
             if pos is not None:
                 self.task = GoToFireplace(pos)
             else:
                 self.task = Sleep()
-        if isinstance(self.task, GoToFireplace):
-            self.go_to_fireplace(self.task)
 
-    def go_to_fireplace(self, fireplace_task: GoToFireplace):
-        direction = fireplace_task.pos - self.params.possition
-        direction = Vector(0, 0, 1)
-        print(direction)
-        self.engines = self.executor.engines_for_speed(direction)
+        if isinstance(self.task, GoToFireplace):
+            self.go_to_fireplace(self.task, dt)
+
+    def go_to_fireplace(self, fireplace_task: GoToFireplace, dt):
+        if (self.params.possition - fireplace_task.pos).length() <= DISTANCE_TO_DROP:
+            self.need_drop = True
+            self.task = GoToHome(self.swarm.get_home_pos(self.params.possition))
+        else:
+            self.go_to(fireplace_task, dt)
+
+    def go_to(self, go_to_task: GoToTask, dt: float):
+        direction = go_to_task.pos - self.params.possition
+        self.engines = self.executor.move_to_direction(direction, 10, 1, dt)
+        # self.engines = self.executor.engines_for_speed(dire)
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
-        """
-        get list(Fireplace(pos, active), drone number which work on in)
-        return number Fireplace which we choose
-        """
-        fireplace_id = 0
-        l = [
-            (self.params.possition - v[0].possition).length()
-            for i, v in enumerate(fireplaces)
-            if v[1] == -1
-        ]
-        if len(l) == 0:
-            return None
-        print(l)
-        fireplace_id = l.index(min(l))
-        fireplaces[fireplace_id][1] = self.id
+        """Ищет ближайший свободный и активный камин и назначает его себе."""
+        best_fp_index = -1
+        min_dist = float("inf")
 
-        print(
-            f"drone: {self.id} with pos: {self.params.possition} \nfind fireplace id: {fireplace_id} \nwith pos: {fireplaces[fireplace_id][0].possition}, \ndistance: {l[fireplace_id]}\n"
-        )
-        return fireplaces[fireplace_id][0].possition
+        for i, fp_info in enumerate(fireplaces):
+            fireplace, assigned_drone_id = fp_info
+            if not fireplace.active and assigned_drone_id == -1:  # Свободен и активен
+                dist = (self.params.possition - fireplace.possition).length()
+                if dist < min_dist:
+                    min_dist = dist
+                    best_fp_index = i
+
+        if best_fp_index != -1:
+            # Нашли камин, назначаем его себе
+            fireplaces[best_fp_index][1] = self.params.id
+            chosen_pos = fireplaces[best_fp_index][0].possition
+            print(
+                f"Drone: {self.params.id} (Pos: {self.params.possition}) assigned to fireplace index: {best_fp_index} at pos: {chosen_pos}, distance: {min_dist:.2f}"
+            )
+            return chosen_pos
+        else:
+            # Свободных активных каминов нет
+            return None
+
+    def log(self):
+        print("=" * 10 + f"DRONE: {self.params.id}" + "=" * 10)
+        print(str(type(self.task)))
+        print(self.params)
+        print(self.engines)
+        print("\n\n")
