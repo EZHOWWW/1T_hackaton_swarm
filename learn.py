@@ -7,6 +7,7 @@ from solution.geometry import Vector
 from solution.simulation import DroneInfo
 from solution.executor import create_actor_model, create_critic_model, MAX_LIDAR_RANGE
 from solution.RL.model import PPOAgent
+from solution.simulation import Simulation, DronesInfo
 
 # --- Simulation Parameters ---
 # REPLACE WITH YOUR ACTUAL SIMULATION BOUNDS AND DT
@@ -20,45 +21,96 @@ ARENA_BOUNDS = (
 )  # (min_x, max_x, min_y, max_y, min_z, max_z)
 SIMULATION_DT = 0.1  # Time step
 BASE_POSITION = Vector(
-    0, 1, 0
+    -77.01, 0.48, 75.31
 )  # Fixed start position for the drone (e.g., on the ground at center)
 TARGET_DETECTION_RADIUS = (
     2.0  # How close drone needs to be to consider target reached XZ
 )
 
 
+class LearnSimulation:
+    def __init__(self, sim_proxy: Simulation):
+        self.sim_proxy = sim_proxy
+
+        self.agents = None  # 5 agents
+
+    def start_learning(
+        self, episodes: int = 1000, save_interval: int = 10, log_interval: int = 10
+    ):
+        """main function to start learning"""
+        for ep in range(episodes):
+            self.learn_episod()
+
+            if ep % save_interval == 0:
+                self.save()
+            if ep % log_interval == 0:
+                self.log()
+
+    def learn_episod(self):
+        """one learn episod"""
+        stop = False
+        # targets = 5 random vectors
+        targets = get_random_targets(ARENA_BOUNDS)
+        while not stop:
+            info = self.sim.get_drones_info()
+            eng = self.step_in_episod(info, targets)
+            self.sim.set_drones(eng)
+            stop = self.stop_episod()
+
+    def step_in_episod(
+        self, info: list[DronesInfo], targets: list[Vector]
+    ) -> list[float]:
+        """here is one step of simulation and learn, return engines"""
+        pass
+
+    def stop_episod(self, info: list[DronesInfo], targets: list[Vector]) -> bool:
+        # True if all drones is crushed or ib target
+        pass
+
+    def save(self):
+        pass
+
+    def log(self):
+        pass
+
+
+def get_random_targets(arena_bounds: tuple[float]) -> list[Vector]:
+    min_b, max_b = (
+        Vector(arena_bounds[0], arena_bounds[2], arena_bounds[4]),
+        Vector(arena_bounds[1], arena_bounds[3], arena_bounds[5]),
+    )
+    targets = [
+        Vector(
+            random.uniform(min_b.x, max_b.x),
+            random.uniform(
+                min_b.y, max_b.y
+            ),  # Target height well above ground, below ceiling
+            random.uniform(min_b.z, max_b.z),
+        )
+        for _ in range(5)
+    ]
+    return targets
+
+
 # --- Mock Simulation Environment ---
 # REPLACE THIS ENTIRE CLASS WITH YOUR ACTUAL SIMULATION INTERFACE
 class MockSimulation:
-    def __init__(self, arena_bounds, dt, base_position, target_detection_radius):
+    def __init__(self, sim, arena_bounds, dt, base_position, target_detection_radius):
         self.arena_bounds = arena_bounds
         self.dt = dt
         self.base_position = base_position
         self.target_detection_radius = target_detection_radius
 
-        # Simple physics constants (very rough approximation) - Scale for new arena size
-        self.GRAVITY = Vector(0, -9.81, 0)
-        self.DRAG_COEFF = 0.5  # Adjusted drag
-        self.THRUST_SCALE = 50.0  # Adjusted thrust scale
-
         self._state = None
         self._target = None
         self._steps_in_episode = 0
         self._max_steps_per_episode = 1000  # Increased max steps for larger arena
-
-        # Simple obstacles (replace with your sim's obstacle handling)
-        # Format: (center_x, center_y, center_z, size_x, size_y, size_z)
-        # Ensure obstacles are within arena bounds
-        self._obstacles = [
-            (50, 10, 50, 10, 20, 10),
-            (-50, 5, -50, 15, 10, 15),
-            (0, 15, 0, 5, 30, 5),  # Tall obstacle in the middle
-        ]
-        # Simplified: Lidars always return 0 (clear) or distance <= MAX_LIDAR_RANGE
+        self.sim = sim
 
     def reset(self):
         """Resets the simulation for a new episode with fixed base start and random target."""
         self._steps_in_episode = 0
+        self.sim.reset()
 
         # Start at the base position
         self._state = DroneInfo(
@@ -413,6 +465,7 @@ if __name__ == "__main__":
         # Save model weights periodically
         if episode % SAVE_INTERVAL == 0:
             agent.save_weights(agent.save_dir)
+        break
 
     print("Training finished.")
     # Save final weights

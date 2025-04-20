@@ -9,6 +9,7 @@ from solution.simulation import DroneInfo
 
 # Import the model creation functions (we will create models directly in PPOAgent)
 from solution.executor import create_actor_model, create_critic_model, MAX_LIDAR_RANGE
+from learn import MockSimulation
 
 
 class PPOAgent:
