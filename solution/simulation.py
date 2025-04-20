@@ -90,5 +90,8 @@ class Simulation:
         self.connection.send_data(concat_engines(eng, 0.1))
         self.can_get_drones_info = True
 
+    def reset(self):
+        pass
+
     def close_connection(self):
         print("close")
