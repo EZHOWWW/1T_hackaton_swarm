@@ -189,9 +189,9 @@ class Engine:
         self.number = number
         if pid_params is None:
             pid_params = {
-                "Kp": 0.6,
-                "Ki": 0.4,
-                "Kd": 0.9,
+                "Kp": 1,
+                "Ki": 1,
+                "Kd": 1,
                 "setpoint": 0.0,
                 "integral_limits": None,
                 "angle_wrap_degrees": None,
@@ -239,7 +239,7 @@ class DroneExecutor:
     # наклон изменяет угол
     def __init__(self, drone):
         self.drone = drone
-        self.attitude_motor = t = 0.5
+        self.attitude_motor = t = 0.6
         engines_data = [
             ("fr", -t, t - 1),  # 0
             ("fl", -t, 1 - t),  # 1
@@ -251,7 +251,7 @@ class DroneExecutor:
             ("rf", t - 1, -t),  # 7
         ]
         self.engines = [
-            Engine(v[0], i, Vector(v[1], 1, v[2]).normalize())
+            Engine(v[0], i, Vector(v[1], 1, -v[2]).normalize())
             for i, v in enumerate(engines_data)
         ]
 
@@ -299,8 +299,8 @@ class DroneExecutor:
                 v.impact_to_direction_up(direction, up_vector, 0.5, dt) + 0.5
             )
 
-        # return np.clip(impact_engines, 0, 1)
-        return self.apply_negativ_to_opposite(impact_engines)
+        return np.clip(impact_engines, 0, 1)
+        # return self.apply_negativ_to_opposite(impact_engines)
 
     def apply_negativ_to_opposite(self, impact_engines: list[float]) -> list[float]:
         for i, v in enumerate(impact_engines):
