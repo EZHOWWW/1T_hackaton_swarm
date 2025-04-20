@@ -178,21 +178,24 @@ class PIDController:
 
 
 class DroneExecutor:
+    # pid for each engine
+    # direction + antigrav
+    # наклон изменяет угол
     def __init__(self, drone):
         self.drone = drone
         self.altitude_pid = PIDController(
-            Kp=0.1,
+            Kp=0.2,
             Ki=0.4,
-            Kd=0.1,
+            Kd=0.9,
             setpoint=self.drone.my_height,
-            output_limits=(0, 0.6),
+            output_limits=(0, 0.8),
         )
         pitch_yaw_pid_params = {
-            "Kp": 0.2,
-            "Ki": 0.3,
-            "Kd": 0.2,
+            "Kp": 0.01,
+            "Ki": 0.01,
+            "Kd": 0.01,
             "setpoint": 0.0,
-            "output_limits": (-0.1, 0.5),
+            "output_limits": (0.0, 0.3),
         }
         self.pitch_pid = PIDController(**pitch_yaw_pid_params)
         self.yaw_pid = PIDController(**pitch_yaw_pid_params)
@@ -212,7 +215,7 @@ class DroneExecutor:
         ]  # 7
         # pitch roll
         # --- Параметры управления ---
-        self.max_tilt_angle = 30.0
+        self.max_tilt_angle = 20.0
 
         self.lidar_effects = {
             "f": Vector(1, 0, 0),
@@ -226,7 +229,7 @@ class DroneExecutor:
             "up": Vector(0, -1, 0),
             "d": Vector(0, 1, 0),
         }
-        self.lidar_mult = 100
+        self.lidar_mult = 25
         self.last_correction = None
         for k, v in self.lidar_effects.items():
             self.lidar_effects[k] = v.normalize()
@@ -265,15 +268,13 @@ class DroneExecutor:
         engines = np.zeros(8)
         print(direction)
         print(self.drone.params.lidars)
-        lidar_correction = self.correct_from_lidars(direction, dt)
-        print(direction + lidar_correction)
-        engines += self.get_altitude_correction(target_height + lidar_correction.y, dt)
-        engines += self.get_pitch_correction(
-            direction + lidar_correction, target_speed, dt
-        )
-        engines += self.get_yaw_correction(
-            direction + lidar_correction, target_speed, dt
-        )
+        # lidar_correction = self.correct_from_lidars(direction, dt)
+        lidar_correction = Vector()
+        direciton_correction = direction - lidar_correction
+        print(direciton_correction)
+        engines += self.get_altitude_correction(target_height, dt)
+        # engines += self.get_pitch_correction(direciton_correction, target_speed, dt)
+        # engines += self.get_yaw_correction(direciton_correction, target_speed, dt)
 
         engines = np.clip(engines, 0, 1)
         return engines
