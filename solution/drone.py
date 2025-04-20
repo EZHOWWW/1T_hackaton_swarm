@@ -78,8 +78,15 @@ class Drone:
 
     def go_to(self, go_to_task: GoToTask, dt: float):
         direction = go_to_task.pos - self.params.possition
-        self.engines = self.executor.move_to_direction(direction, self.my_height, 1, dt)
-        # self.engines = self.executor.engines_for_speed(dire)
+        direction = self.params.possition
+        direction.y += 5
+        direction = Vector(0.0, 0.9, 0.0).normalize()
+        if self.params.possition.y > 3:
+            print("EHFFF")
+            direction = Vector(0.1, 0.9, 0).normalize()
+        self.engines = self.executor.move_to_direction(
+            direction, self.my_height, dt, 10
+        )
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
         """Ищет ближайший свободный и активный камин и назначает его себе."""

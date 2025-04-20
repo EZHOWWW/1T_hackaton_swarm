@@ -177,28 +177,86 @@ class PIDController:
         return output
 
 
+class Engine:
+    def __init__(
+        self,
+        name: str,
+        number: int,
+        impact_direction: Vector,
+        pid_params: dict | None = None,
+    ):
+        self.name = name
+        self.number = number
+        if pid_params is None:
+            pid_params = {
+                "Kp": 0.6,
+                "Ki": 0.4,
+                "Kd": 0.9,
+                "setpoint": 0.0,
+                "integral_limits": None,
+                "angle_wrap_degrees": None,
+                "output_limits": (-1, 1),
+            }
+        self.pid = PIDController(**pid_params)
+        self.impact_direction = impact_direction
+        self.last_impact = 0
+
+    def impact_on_direction(
+        self, target: Vector, current_up_vector: Vector, dt: float
+    ) -> float:
+        setpoint = self.impact_direction.dot(target)  # проекция цели на вектор мотора
+        self.pid.setpoint = setpoint
+        measurement = target.dot(current_up_vector)  # проекция текущего положения
+        impact = self.pid.update(measurement, dt)
+        return impact
+
+    def impact_to_direction_up(
+        self, target: Vector, current_up_vector: Vector, speed: float, dt: float
+    ) -> float:
+        """
+        rotate drone to look up on target
+        Parameters
+            ----------
+            target : Vector length = 1
+            current_up_vector : Vector lenght = 1
+            speed : float in [0, 1]
+            df : float
+        """
+        setpoint = self.impact_direction.dot(target)
+        self.pid.setpoint = setpoint
+        measurement = self.impact_direction.dot(current_up_vector)
+        result_impact = self.pid.update(measurement, dt) * speed
+        print(
+            f"{self.name} {self.number} | setpoint: {setpoint},\t measurement: {measurement}, impact: {result_impact}"
+        )
+        self.last_impact = result_impact
+        return result_impact
+
+
 class DroneExecutor:
     # pid for each engine
     # direction + antigrav
     # наклон изменяет угол
     def __init__(self, drone):
         self.drone = drone
-        self.attitude_motor = t = 0.6
-        self.engines_effects = [
-            Vector(*i, z=1)
-            for i in [
-                (-t, t - 1),  # 0
-                (-t, 1 - t),  # 1
-                (t - 1, t),  # 2
-                (1 - t, t),  # 3
-                (t, 1 - t),  # 4
-                (t, t - 1),  # 5
-                (1 - t, -t),  # 6
-                (t - 1, -t),
-            ]
-        ]  # 7
+        self.attitude_motor = t = 0.5
+        engines_data = [
+            ("fr", -t, t - 1),  # 0
+            ("fl", -t, 1 - t),  # 1
+            ("lf", t - 1, t),  # 2
+            ("lb", 1 - t, t),  # 3
+            ("bl", t, 1 - t),  # 4
+            ("br", t, t - 1),  # 5
+            ("rb", 1 - t, -t),  # 6
+            ("rf", t - 1, -t),  # 7
+        ]
+        self.engines = [
+            Engine(v[0], i, Vector(v[1], 1, v[2]).normalize())
+            for i, v in enumerate(engines_data)
+        ]
+
         # pitch roll
-        # --- Параметры управления --sssssssssssssss
+        # --- Параметры управления --
         self.max_tilt_angle = 20.0
 
         self.lidar_effects = {
@@ -218,11 +276,92 @@ class DroneExecutor:
         self.lidar_mult = 25
 
     def move_to_direction(
-        self, direction: Vector, target_height: float, target_speed: float, dt: float
+        self,
+        direction: Vector,
+        target_height: float,
+        dt: float,
+        target_speed: float | None = None,
+        compensate_gravity=True,
     ) -> list[float]:
-        engines = np.zeros(8)
+        print(direction)
+        # if compensate_gravity:
+        #     direction += self.gravity_compince(direction)
+        # if target_speed is not None:
+        #     direction = direction.normalize() * target_speed
 
-        return engines
+        # print(direction)
+
+        impact_engines = [0] * 8
+        up_vector = self.get_up_vector(self.drone.params.angle)
+        print(up_vector)
+        for i, v in enumerate(self.engines):
+            impact_engines[i] = (
+                v.impact_to_direction_up(direction, up_vector, 0.5, dt) + 0.5
+            )
+
+        # return np.clip(impact_engines, 0, 1)
+        return self.apply_negativ_to_opposite(impact_engines)
+
+    def apply_negativ_to_opposite(self, impact_engines: list[float]) -> list[float]:
+        for i, v in enumerate(impact_engines):
+            if v < 0:
+                impact_engines[(i + 4) % 8] -= v
+                impact_engines[i] = 0
+        return impact_engines
+
+    def get_up_vector(self, rotate: list[float] | None = None) -> Vector:
+        """
+        Вычисляет единичный вектор, направленный вверх, на основе углов Эйлера дрона.
+
+        Args:
+            rotate: Список из трех углов (тангаж, рысканье, крен) в градусах.
+                    Порядок: [тангаж (pitch), рысканье (yaw), крен (roll)].
+
+        Returns:
+            Единичный вектор (numpy array) [x, y, z], представляющий направление "вверх".
+        """
+        if rotate is None:
+            rotate = self.drone.params.angle
+        pitch_rad = np.deg2rad(rotate[0])
+        yaw_rad = np.deg2rad(rotate[1])
+        roll_rad = np.deg2rad(rotate[2])
+
+        # Матрицы вращения вокруг осей X, Y и Z
+        Rx = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(pitch_rad), -np.sin(pitch_rad)],
+                [0, np.sin(pitch_rad), np.cos(pitch_rad)],
+            ]
+        )
+
+        Ry = np.array(
+            [
+                [np.cos(yaw_rad), 0, np.sin(yaw_rad)],
+                [0, 1, 0],
+                [-np.sin(yaw_rad), 0, np.cos(yaw_rad)],
+            ]
+        )
+
+        Rz = np.array(
+            [
+                [np.cos(roll_rad), -np.sin(roll_rad), 0],
+                [np.sin(roll_rad), np.cos(roll_rad), 0],
+                [0, 0, 1],
+            ]
+        )
+        # Матрица вращения, представляющая ориентацию дрона (в мировых координатах)
+        # Порядок умножения матриц важен: сначала крен, затем тангаж, затем рысканье (ZYX)
+        R = Ry @ Rx @ Rz
+
+        up_local = np.array([0, 1, 0])
+
+        up_global = R @ up_local
+
+        return Vector(*up_global)
+
+    def gravity_compince(self, direction: Vector) -> Vector:
+        return Vector(y=direction.length() * 1)
 
     def correct_from_lidars(self, direction: Vector, dt: float) -> Vector:
         correction = Vector()
