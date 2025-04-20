@@ -181,16 +181,16 @@ class DroneExecutor:
     def __init__(self, drone):
         self.drone = drone
         self.altitude_pid = PIDController(
-            Kp=0.2,
-            Ki=0.2,
-            Kd=0.5,
+            Kp=0.1,
+            Ki=0.4,
+            Kd=0.1,
             setpoint=self.drone.my_height,
             output_limits=(0, 0.6),
         )
         pitch_yaw_pid_params = {
-            "Kp": 0.1,
-            "Ki": 0.2,
-            "Kd": 0.1,
+            "Kp": 0.2,
+            "Ki": 0.3,
+            "Kd": 0.2,
             "setpoint": 0.0,
             "output_limits": (-0.1, 0.5),
         }
@@ -212,7 +212,7 @@ class DroneExecutor:
         ]  # 7
         # pitch roll
         # --- Параметры управления ---
-        self.max_tilt_angle = 10.0
+        self.max_tilt_angle = 30.0
 
         self.lidar_effects = {
             "f": Vector(1, 0, 0),
