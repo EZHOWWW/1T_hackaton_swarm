@@ -46,7 +46,7 @@ class Drone:
         self.engines: list[float] = [0.0] * 8
         self.need_drop: bool = False
 
-        self.my_height = id * 3 + 3
+        self.my_height = 10
         self.executor = DroneExecutor(self)
 
     def update(self, dt: float):
