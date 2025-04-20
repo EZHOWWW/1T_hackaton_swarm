@@ -1,4 +1,5 @@
 import asyncio
+from solution.executor import DroneExecutor
 from solution.simulation import Simulation, Fireplace
 from abc import ABC
 from solution.geometry import Vector
@@ -31,35 +32,6 @@ class GoToHome(GoToTask):
         super().__init__(home_pos)
 
 
-class DroneExecutor:
-    def __init__(self, drone):
-        self.drone = drone
-        self.engine_possition_ration = t = 0.25
-        z = 1 - (t**2 + (1 - t) ** 2)  # vector len = 1
-        self.engines_vector_effect = [
-            Vector(t, 1 - t, z),  # 1 fr
-            Vector(-t, 1 - t, z),  # 2 fl
-            -Vector(-t, 1 - t, z),  # 3 br
-            -Vector(t, 1 - t, z),  # 4 bl
-            Vector(1 - t, t, z),  # 5 rf
-            Vector(1 - t, -t, z),  # 6 rb
-            -Vector(1 - t, -t, z),  # 7 lf
-            -Vector(1 - t, t, z),  # 8 lb
-        ]
-        self.desired_speed = Vector()
-
-    def engines_for_speed(self, desired_speed: Vector = Vector()) -> list[float]:
-        from numpy import clip
-
-        self.desired_speed = desired_speed
-
-        engines = [0] * 8
-        for i, v in enumerate(self.engines_vector_effect):
-            engines[i] = self.desired_speed.dot(v)
-        # if < 0 need up other engine
-        return clip(engines, 0, 1)
-
-
 class Drone:
     def __init__(self, id: int, sim: Simulation, swarm):
         self.active = True
@@ -86,13 +58,10 @@ class Drone:
             else:
                 self.task = Sleep()
         if isinstance(self.task, GoToFireplace):
-            self.go_to_fireplace(self.task)
+            self.go_to_fireplace(self.task, 0.1)
 
-    def go_to_fireplace(self, fireplace_task: GoToFireplace):
-        direction = fireplace_task.pos - self.params.possition
-        direction = Vector(0, 0, 1)
-        print(direction)
-        self.engines = self.executor.engines_for_speed(direction)
+    def go_to_fireplace(self, fireplace_task: GoToFireplace, dt: float):
+        self.engines = self.executor.move_to(self.params, fireplace_task.pos, dt)
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
         """
