@@ -8,7 +8,7 @@ class Swarm:
     def __init__(self, sim: Simulation, unit_count: int = 5):
         self.sim = sim
         self.unit_count = unit_count
-        self.units = [Drone(self.sim, self) for i in range(self.unit_count)]
+        self.units = [Drone(i, self.sim, self) for i in range(self.unit_count)]
         self.fireplaces = None
 
     def start(self):
@@ -24,7 +24,7 @@ class Swarm:
             for u in self.units:
                 u.update(dt * 10)
             self.upload_drones_info()
-            time.sleep(1.0)
+            time.sleep(0.1)
 
     def update_drones_info(self):
         info = self.sim.get_drones_info()
