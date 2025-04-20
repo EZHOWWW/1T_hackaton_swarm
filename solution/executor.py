@@ -7,6 +7,7 @@ class PIDController:
     """
     Простой ПИД-регулятор.
     """
+
     def __init__(
         self,
         Kp,
@@ -179,158 +180,108 @@ class PIDController:
 class DroneExecutor:
     def __init__(self, drone):
         self.drone = drone
-
-        # --- Конфигурация PID (НУЖНО ТЩАТЕЛЬНО НАСТРОИТЬ!) ---
-        self.base_thrust = 0.5
         self.altitude_pid = PIDController(
-            Kp=1.0, Ki=0.05, Kd=0.6, setpoint=10.0, output_limits=(-0.5, 0.5)
+            Kp=0.2,
+            Ki=0.2,
+            Kd=0.5,
+            setpoint=self.drone.my_height,
+            output_limits=(0, 0.6),
         )
-        self.pitch_pid = PIDController(
-            Kp=0.04, Ki=0.01, Kd=0.03, setpoint=0.0, output_limits=(-0.3, 0.3)
-        )
-        self.roll_pid = PIDController(
-            Kp=0.04, Ki=0.01, Kd=0.03, setpoint=0.0, output_limits=(-0.3, 0.3)
-        )
-        self.target_yaw = 0.0
-        self.yaw_pid = PIDController(
-            Kp=0.05,
-            Ki=0.005,
-            Kd=0.02,
-            setpoint=self.target_yaw,
-            output_limits=(-0.2, 0.2),
-            angle_wrap_degrees=360,
-        )
-
+        pitch_yaw_pid_params = {
+            "Kp": 0.1,
+            "Ki": 0.2,
+            "Kd": 0.1,
+            "setpoint": 0.0,
+            "output_limits": (-0.1, 0.5),
+        }
+        self.pitch_pid = PIDController(**pitch_yaw_pid_params)
+        self.yaw_pid = PIDController(**pitch_yaw_pid_params)
+        self.attitude_motor = t = 0.6
+        self.engines_effects = [
+            Vector(*i, z=1)
+            for i in [
+                (-t, t - 1),  # 0
+                (-t, 1 - t),  # 1
+                (t - 1, t),  # 2
+                (1 - t, t),  # 3
+                (t, 1 - t),  # 4
+                (t, t - 1),  # 5
+                (1 - t, -t),  # 6
+                (t - 1, -t),
+            ]
+        ]  # 7
+        # pitch roll
         # --- Параметры управления ---
-        self.max_tilt_angle = 15.0
+        self.max_tilt_angle = 10.0
 
-        # --- Конфигурация моторов (Круговая, 8 моторов) ---
-        # ВАЖНО: Проверьте предположения о нумерации и вращении!
-        # Предположения:
-        # 1. Мотор 0 - спереди (положительное направление оси X дрона).
-        # 2. Нумерация идет ПРОТИВ часовой стрелки (CCW). (0=Перед, 1=Перед-Лево, 2=Лево, ..., 7=Перед-Право)
-        # 3. Четные моторы (0, 2, 4, 6) вращаются CCW (создают реактивный момент CW на раму = -Yaw).
-        # 4. Нечетные моторы (1, 3, 5, 7) вращаются CW (создают реактивный момент CCW на раму = +Yaw).
-        # 5. Симуляция моделирует реактивный момент.
-        # 6. Положительный Roll = правый борт вниз. Положительный Pitch = нос вверх.
+        self.lidar_effects = {
+            "f": Vector(1, 0, 0),
+            "fr": Vector(1, 0, -1),
+            "r": Vector(0, 0, -1),
+            "br": Vector(-1, 0, -1),
+            "b": Vector(-1, 0, 0),
+            "bl": Vector(-1, 0, 1),
+            "l": Vector(0, 0, 1),
+            "fl": Vector(1, 0, 1),
+            "up": Vector(0, -1, 0),
+            "d": Vector(0, 1, 0),
+        }
+        self.lidar_mult = 100
+        self.last_correction = None
+        for k, v in self.lidar_effects.items():
+            self.lidar_effects[k] = v.normalize()
 
-        num_motors = 8
-        self.motor_effects = []
-        # Углы моторов против часовой стрелки от оси X+ (вперед)
-        angles_rad = [i * (2 * math.pi / num_motors) for i in range(num_motors)]
-        # Пример: 0: 0, 1: pi/4, 2: pi/2, 3: 3pi/4, 4: pi, 5: 5pi/4, 6: 3pi/2, 7: 7pi/4
-
-        print("Initializing Motor Effects (Circular Octo):")  # Отладочный вывод
-        print(
-            "Assumptions: 0=Front, numbering CCW. Even motors=CCW(-Yaw), Odd motors=CW(+Yaw)"
+    def get_altitude_correction(self, target_height: float, dt: float) -> list[float]:
+        self.altitude_pid.setpoint = target_height
+        return np.full(
+            8,
+            self.altitude_pid.update(self.drone.params.possition.y, dt),
+            dtype=np.float64,
         )
 
-        for i in range(num_motors):
-            angle = angles_rad[i]
-            # Roll Effect = sin(angle) (Момент вокруг оси X = r_y * Fz)
-            roll_effect = math.sin(angle)
-            # Pitch Effect = -cos(angle) (Момент вокруг оси Y = -r_x * Fz)
-            pitch_effect = -math.cos(angle)
-            # Yaw Effect (Реактивный момент на раму): +1 для CW моторов (нечетные), -1 для CCW моторов (четные)
-            yaw_effect = +1 if i % 2 != 0 else -1
+    def get_pitch_correction(
+        self, direction: Vector, target_speed: float, dt: float
+    ) -> list[float]:
+        cur_angle = self.drone.params.angle[0]
+        val = direction.z / direction.length() * self.max_tilt_angle
+        self.pitch_pid.setpoint = val
+        currection = self.pitch_pid.update(cur_angle, dt)
 
-            # Округление для наглядности (можно убрать)
-            roll_effect = round(roll_effect, 3)
-            pitch_effect = round(pitch_effect, 3)
+        return np.array([1, 1, 0, 0, -1, -1, 0, 0]) * currection
 
-            self.motor_effects.append([roll_effect, pitch_effect, yaw_effect])
-            # Отладка:
-            # print(f"  Motor {i} ({(math.degrees(angle)):.0f} deg): Roll={roll_effect:.2f}, Pitch={pitch_effect:.2f}, Yaw={yaw_effect}")
+    def get_yaw_correction(
+        self, direction: Vector, target_speed: float, dt: float
+    ) -> list[float]:
+        cur_angle = self.drone.params.angle[2]
+        val = -direction.x / direction.length() * self.max_tilt_angle
+        self.yaw_pid.setpoint = val
+        currection = self.yaw_pid.update(cur_angle, dt)
 
-        # Результат расчета (примерный):
-        # Motor 0 (0 deg):   Roll=0.00, Pitch=-1.00, Yaw=-1 (CCW)
-        # Motor 1 (45 deg):  Roll=0.71, Pitch=-0.71, Yaw=+1 (CW)
-        # Motor 2 (90 deg):  Roll=1.00, Pitch=-0.00, Yaw=-1 (CCW)
-        # Motor 3 (135 deg): Roll=0.71, Pitch=0.71,  Yaw=+1 (CW)
-        # Motor 4 (180 deg): Roll=0.00, Pitch=1.00,  Yaw=-1 (CCW)
-        # Motor 5 (225 deg): Roll=-0.71,Pitch=0.71,  Yaw=+1 (CW)
-        # Motor 6 (270 deg): Roll=-1.00,Pitch=0.00,  Yaw=-1 (CCW)
-        # Motor 7 (315 deg): Roll=-0.71,Pitch=-0.71, Yaw=+1 (CW)
-        # !!! ПРОВЕРЬТЕ ЭТУ МАТРИЦУ И ПРЕДПОЛОЖЕНИЯ В СИМУЛЯЦИИ !!!
+        return np.array([0, 0, 1, 1, 0, 0, -1, -1]) * currection
 
-    # --- Методы update_attitude_pids, update_altitude_pid ---
-    # (Остаются без изменений по сравнению с предыдущим ответом)
-    def update_attitude_pids(self, target_pitch, target_roll, dt):
-        # ... (код как прежде) ...
-        if self.drone.params is None:
-            return 0, 0, 0
-        current_pitch = self.drone.params.angle[0]
-        current_yaw = self.drone.params.angle[1]
-        current_roll = self.drone.params.angle[2]
-        self.pitch_pid.setpoint = target_pitch
-        pitch_correction = self.pitch_pid.update(current_pitch, dt)
-        self.roll_pid.setpoint = target_roll
-        roll_correction = self.roll_pid.update(current_roll, dt)
-        self.yaw_pid.setpoint = self.target_yaw
-        yaw_correction = self.yaw_pid.update(current_yaw, dt)
-        return pitch_correction, roll_correction, yaw_correction
-
-    def update_altitude_pid(self, target_height, dt):
-        # ... (код как прежде) ...
-        if self.drone.params is None:
-            return self.base_thrust
-        current_height = self.drone.params.possition.z
-        self.altitude_pid.setpoint = target_height
-        altitude_correction = self.altitude_pid.update(current_height, dt)
-        total_thrust = self.base_thrust + altitude_correction
-        return total_thrust
-
-    # --- Метод move_to_direction ---
-    # (Логика расчета целевых углов и вызова PID остается)
-    # (Изменяется только применение коррекций в цикле смешивания моторов)
     def move_to_direction(
         self, direction: Vector, target_height: float, target_speed: float, dt: float
     ) -> list[float]:
-        if self.drone.params is None or not self.drone.params.is_alive:
-            return [0.0] * 8
-
-        # --- Шаг 1: Вычисление целевых углов ---
-        # ... (код расчета target_pitch, target_roll как прежде) ...
-        if direction.length() > 1e-6:
-            desired_velocity_xy = direction.replace(z=0).normalize() * target_speed
-        else:
-            desired_velocity_xy = Vector(0, 0, 0)
-        target_yaw_rad = math.radians(self.target_yaw)
-        cos_yaw = math.cos(-target_yaw_rad)
-        sin_yaw = math.sin(-target_yaw_rad)
-        target_vel_x_drone = (
-            desired_velocity_xy.x * cos_yaw - desired_velocity_xy.y * sin_yaw
+        engines = np.zeros(8)
+        print(direction)
+        print(self.drone.params.lidars)
+        lidar_correction = self.correct_from_lidars(direction, dt)
+        print(direction + lidar_correction)
+        engines += self.get_altitude_correction(target_height + lidar_correction.y, dt)
+        engines += self.get_pitch_correction(
+            direction + lidar_correction, target_speed, dt
         )
-        target_vel_y_drone = (
-            desired_velocity_xy.x * sin_yaw + desired_velocity_xy.y * cos_yaw
+        engines += self.get_yaw_correction(
+            direction + lidar_correction, target_speed, dt
         )
-        gain_vel_to_angle = 0.8
-        # Проверьте знаки для вашей системы координат!
-        target_pitch = -target_vel_x_drone * gain_vel_to_angle
-        target_roll = target_vel_y_drone * gain_vel_to_angle
-        target_pitch = max(-self.max_tilt_angle, min(self.max_tilt_angle, target_pitch))
-        target_roll = max(-self.max_tilt_angle, min(self.max_tilt_angle, target_roll))
 
-        # --- Шаг 2: Обновление PID регуляторов ---
-        pitch_correction, roll_correction, yaw_correction = self.update_attitude_pids(
-            target_pitch, target_roll, dt
-        )
-        thrust = self.update_altitude_pid(target_height, dt)
+        engines = np.clip(engines, 0, 1)
+        return engines
 
-        # --- Шаг 3: Распределение тяги и коррекций по моторам ---
-        # Используем НОВУЮ матрицу self.motor_effects
-        engines = [0.0] * 8
-        for i in range(8):
-            motor_thrust = thrust
-            # Применяем коррекции моментов от PIDов
-            motor_thrust += self.motor_effects[i][0] * roll_correction  # Крен
-            motor_thrust += self.motor_effects[i][1] * pitch_correction  # Тангаж
-            motor_thrust += (
-                self.motor_effects[i][2] * yaw_correction
-            )  # Рысканье (Реактивный момент)
-            engines[i] = motor_thrust
-
-        # --- Шаг 4: Нормализация и ограничение выхода моторов ---
-        engines = np.clip(np.array(engines), 0.0, 1.0)
-
-        return engines.tolist()
+    def correct_from_lidars(self, direction: Vector, dt: float) -> Vector:
+        correction = Vector()
+        for k, v in self.drone.params.lidars.items():
+            if v == 0:
+                continue
+            correction += self.lidar_effects[k] / v * self.lidar_mult
+        return correction

@@ -32,12 +32,12 @@ class GoToHome(GoToTask):
         super().__init__(home_pos)
 
 
-DISTANCE_TO_DROP = 1
+DISTANCE_TO_DROP = 1.7
 
 
 class Drone:
-    def __init__(self, sim: Simulation, swarm):
-        self.executor = DroneExecutor(self)
+    def __init__(self, id: int, sim: Simulation, swarm):
+        self.id = id
         self.sim = sim
         self.swarm = swarm
         self.task: Task = FindFireplace()
@@ -46,8 +46,13 @@ class Drone:
         self.engines: list[float] = [0.0] * 8
         self.need_drop: bool = False
 
+        self.my_height = id * 3 + 3
+        self.executor = DroneExecutor(self)
+
     def update(self, dt: float):
         """now self.params and self.engines is actual"""
+        if self.need_drop:
+            self.need_drop = False
         self.solve_task(self.task, dt)
         self.log()
 
@@ -63,7 +68,9 @@ class Drone:
             self.go_to_fireplace(self.task, dt)
 
     def go_to_fireplace(self, fireplace_task: GoToFireplace, dt):
-        if (self.params.possition - fireplace_task.pos).length() <= DISTANCE_TO_DROP:
+        if (self.params.possition - fireplace_task.pos).replace(
+            y=0
+        ).length() <= DISTANCE_TO_DROP:
             self.need_drop = True
             self.task = GoToHome(self.swarm.get_home_pos(self.params.possition))
         else:
@@ -71,7 +78,7 @@ class Drone:
 
     def go_to(self, go_to_task: GoToTask, dt: float):
         direction = go_to_task.pos - self.params.possition
-        self.engines = self.executor.move_to_direction(direction, 10, 1, dt)
+        self.engines = self.executor.move_to_direction(direction, self.my_height, 1, dt)
         # self.engines = self.executor.engines_for_speed(dire)
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
@@ -101,7 +108,7 @@ class Drone:
 
     def log(self):
         print("=" * 10 + f"DRONE: {self.params.id}" + "=" * 10)
-        print(str(type(self.task)))
+        print(type(self.task), self.task.pos)
         print(self.params)
         print(self.engines)
         print("\n\n")
