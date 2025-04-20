@@ -124,12 +124,14 @@ class PPOAgent:
     def get_action_and_log_prob(self, state_vector, explore=True):
         """Gets action by sampling from a Gaussian centered at actor mean (with noise for exploration)
         and calculates approximate log probability."""
-        # state_vector = state_vector.reshape(1, -1)  # Add batch dimension
-        state_vector = np.expand_dims(state_vector, axis=0)  # Преобразует (n,) в (1, n)
+        state_vector = state_vector.reshape(1, -1)  # Add batch dimension
+        # state_vector = np.expand_dims(state_vector, axis=0)  # Преобразует (n,) в (1, n)
+        state_vector = state_vector.astype(np.float32)  # или tf.float32
 
         # Get the mean action from the actor
-        print("State vector shape:", state_vector.shape)
-        mean_action = self.actor(state_vector)[0]  # Shape (8,)
+        # Принудительно используем CPU
+        with tf.device("/CPU:0"):
+            mean_action = self.actor(state_vector)[0]
         mean_action_np = mean_action.numpy()  # Convert to numpy
 
         # Define a base standard deviation (could be learned by actor)
@@ -158,9 +160,11 @@ class PPOAgent:
             normal_dist = tf.compat.v1.distributions.Normal(
                 loc=mean_action, scale=std_dev
             )
-            log_prob = tf.reduce_sum(
-                normal_dist.log_prob(action), axis=-1
-            )  # Sum log probs across actions
+
+            with tf.device("/CPU:0"):
+                log_prob = tf.reduce_sum(
+                    normal_dist.log_prob(action), axis=-1
+                )  # Sum log probs across actions
 
             # Clamp the action to [0, 1] after sampling
             action = tf.clip_by_value(action, 0.0, 1.0)
