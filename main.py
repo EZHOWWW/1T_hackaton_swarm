@@ -6,6 +6,9 @@ from services.logger import set_logger_config
 async def start_websocket():
     from solution.simulation import Simulation
     from solution.swarm import Swarm
+    import tensorflow as tf
+
+    print("Num GPUs Available: ", len(tf.config.list_physical_devices("GPU")))
 
     sim = Simulation()
     await sim.connect_to_server()
