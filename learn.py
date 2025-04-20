@@ -1,16 +1,30 @@
 # learn.py
+# learn.py
 import numpy as np
 import tensorflow as tf
 import random
 from collections import deque
+import os
+import time  # For logging training time
+
+# Assuming these are correctly defined and importable from your project structure
 from solution.geometry import Vector
-from solution.simulation import DroneInfo
-from solution.executor import create_actor_model, create_critic_model, MAX_LIDAR_RANGE
-from solution.RL.model import PPOAgent
-from solution.simulation import Simulation, DronesInfo
+from solution.simulation import (
+    Simulation,
+    DroneInfo,
+    DronesInfo,
+)  # Assuming DronesInfo is list[DroneInfo]
+
+# Assuming PPOAgent, create_actor_model, create_critic_model, MAX_LIDAR_RANGE are in solution.RL.model
+from solution.RL.model import (
+    PPOAgent,
+    create_actor_model,
+    create_critic_model,
+    MAX_LIDAR_RANGE,
+)
+
 
 # --- Simulation Parameters ---
-# REPLACE WITH YOUR ACTUAL SIMULATION BOUNDS AND DT
 ARENA_BOUNDS = (
     -100,
     100,
@@ -27,446 +41,505 @@ TARGET_DETECTION_RADIUS = (
     2.0  # How close drone needs to be to consider target reached XZ
 )
 
+# --- RL Reward Coefficients ---
+# These need tuning based on the simulation scale and desired behavior
+REWARD_COEFF_DISTANCE_XZ = 0.5  # Penalty for XZ distance (per meter)
+REWARD_COEFF_HEIGHT_PENALTY = 5.0  # Penalty for being below target Y (per meter below)
+REWARD_COEFF_TIME = 0.05  # Penalty per simulation step
+REWARD_BONUS_REACH = 2000.0  # Bonus for reaching the target
+REWARD_PENALTY_CRASH = 5000.0  # Large penalty for crashing
+
+# --- Training Parameters ---
+STATE_SIZE = (
+    3 + 3 + 3 + 3 + 10 + 3 + 1
+)  # pos, vel, angle, ang_vel, lidars, target_vec, dist
+ACTION_SIZE = 8  # motor powers
+BATCH_SIZE = 256  # Number of experiences per agent to collect before update
+PPO_EPOCHS = 10  # Number of times to update using the same batch
+
 
 class LearnSimulation:
-    def __init__(self, sim_proxy: Simulation):
+    def __init__(self, sim_proxy: Simulation, num_drones: int = 5):
         self.sim_proxy = sim_proxy
+        self.num_drones = num_drones
 
-        self.agents = None  # 5 agents
+        # Create a separate PPOAgent for each drone
+        self.agents: list[PPOAgent] = []
+        for i in range(self.num_drones):
+            agent = PPOAgent(
+                state_size=STATE_SIZE,
+                action_size=ACTION_SIZE,
+                arena_bounds=ARENA_BOUNDS,  # Pass simulation bounds to agent
+                dt=SIMULATION_DT,  # Pass simulation dt to agent
+                base_position=BASE_POSITION,  # Pass base position (might not be used by agent directly, but sim needs it)
+                target_detection_radius=TARGET_DETECTION_RADIUS,  # Pass target radius
+                # Pass reward coefficients if agent calculates rewards internally (better to calculate in LearnSimulation)
+                # Or just note that agent's internal reward logic should match LearnSimulation's
+                # Let's calculate rewards here and pass them to agent.store_transition
+                ppo_epochs=PPO_EPOCHS,  # Pass PPO hyperparams
+                batch_size=BATCH_SIZE,  # Pass PPO hyperparams
+                save_dir=f"./drone_rl_models/agent_{i}",  # Separate save dir for each agent
+            )
+            self.agents.append(agent)
+
+        self.episode_rewards: list[deque] = [
+            deque(maxlen=100) for _ in range(self.num_drones)
+        ]  # To track recent avg reward per drone
+        self._current_targets: list[
+            Vector
+        ] = []  # Store targets for the current episode
+        self._step_count = 0
+        self._max_steps_per_episode = 1000  # Max steps before episode timeout
+
+        # Store info from the *previous* step to calculate transition (s, a, r, s', done)
+        # We need state_vector, action, log_prob from t, and reward, next_state_vector, done from t+1
+        self._prev_step_data: list[dict] = [{} for _ in range(self.num_drones)]
 
     def start_learning(
-        self, episodes: int = 1000, save_interval: int = 10, log_interval: int = 10
+        self, episodes: int = 10000, save_interval: int = 200, log_interval: int = 10
     ):
         """main function to start learning"""
-        for ep in range(episodes):
-            self.learn_episod()
+        print(
+            f"Starting training for {self.num_drones} drones over {episodes} episodes..."
+        )
 
-            if ep % save_interval == 0:
-                self.save()
+        # Load initial weights for all agents
+        # Note: Consider if you want agents to start with same weights or different
+        # Loading from separate dirs means they start independent unless you copy weights
+        for i, agent in enumerate(self.agents):
+            agent.load_weights(agent.save_dir)  # Each agent loads from its own dir
+
+        total_steps = 0
+        for ep in range(1, episodes + 1):
+            episode_start_time = time.time()
+            episode_steps = self.learn_episod()
+            total_steps += episode_steps
+            episode_end_time = time.time()
+
+            # Log progress
             if ep % log_interval == 0:
-                self.log()
+                self.log(ep, total_steps, episode_end_time - episode_start_time)
+
+            # Save weights
+            if ep % save_interval == 0:
+                self.save(ep)
+
+        print("\nTraining finished.")
+        self.save(episodes)  # Save final weights
 
     def learn_episod(self):
         """one learn episod"""
+        # Reset the simulation and get initial info for all drones
+        # Assuming sim_proxy.reset() resets all drones to BASE_POSITION and initial state
+        self.sim_proxy.reset()
+        current_info = self.sim_proxy.get_drones_info()  # Get info *after* reset
+
+        # Generate random targets for each drone
+        self._current_targets = self._get_random_targets(ARENA_BOUNDS)
+
+        # Reset step counter and previous step data storage
+        self._step_count = 0
+        self._prev_step_data = [
+            {} for _ in range(self.num_drones)
+        ]  # Clear previous data
+
         stop = False
-        # targets = 5 random vectors
-        targets = get_random_targets(ARENA_BOUNDS)
-        while not stop:
-            info = self.sim.get_drones_info()
-            eng = self.step_in_episod(info, targets)
-            self.sim.set_drones(eng)
-            stop = self.stop_episod()
+        episode_steps = 0
 
-    def step_in_episod(
-        self, info: list[DronesInfo], targets: list[Vector]
-    ) -> list[float]:
-        """here is one step of simulation and learn, return engines"""
-        pass
+        # Main episode loop
+        while not stop and self._step_count < self._max_steps_per_episode:
+            episode_steps += 1
+            self._step_count += 1
 
-    def stop_episod(self, info: list[DronesInfo], targets: list[Vector]) -> bool:
-        # True if all drones is crushed or ib target
-        pass
+            # Get actions for all drones for the current state
+            all_engines = self._get_actions_for_drones(
+                current_info, self._current_targets
+            )
 
-    def save(self):
-        pass
+            # Apply actions to the simulation
+            self.sim_proxy.set_drones(all_engines)
 
-    def log(self):
-        pass
+            # The simulation advances. Get the *next* state information
+            next_info = self.sim_proxy.get_drones_info()
 
+            # Process transitions, calculate rewards, and update agents
+            self._process_step_transitions(
+                current_info, all_engines, next_info, self._current_targets
+            )
 
-def get_random_targets(arena_bounds: tuple[float]) -> list[Vector]:
-    min_b, max_b = (
-        Vector(arena_bounds[0], arena_bounds[2], arena_bounds[4]),
-        Vector(arena_bounds[1], arena_bounds[3], arena_bounds[5]),
-    )
-    targets = [
-        Vector(
-            random.uniform(min_b.x, max_b.x),
-            random.uniform(
-                min_b.y, max_b.y
-            ),  # Target height well above ground, below ceiling
-            random.uniform(min_b.z, max_b.z),
-        )
-        for _ in range(5)
-    ]
-    return targets
+            # Update current info for the next step
+            current_info = next_info
 
+            # Check if the episode should stop
+            stop = self._stop_episod(next_info, self._current_targets)
 
-# --- Mock Simulation Environment ---
-# REPLACE THIS ENTIRE CLASS WITH YOUR ACTUAL SIMULATION INTERFACE
-class MockSimulation:
-    def __init__(self, sim, arena_bounds, dt, base_position, target_detection_radius):
-        self.arena_bounds = arena_bounds
-        self.dt = dt
-        self.base_position = base_position
-        self.target_detection_radius = target_detection_radius
+            # Check if any agent buffer is full and perform update
+            for i, agent in enumerate(self.agents):
+                if len(agent.buffer) >= agent.batch_size:
+                    # print(f"Agent {i} buffer full ({len(agent.buffer)}). Updating models.")
+                    agent.update_models()
+                    # Note: In a truly parallel setup, updates might happen on a separate thread/process
 
-        self._state = None
-        self._target = None
-        self._steps_in_episode = 0
-        self._max_steps_per_episode = 1000  # Increased max steps for larger arena
-        self.sim = sim
+        # --- Episode End ---
+        # Process the last step's transition with done=True
+        # Rewards for the final step (crash/reach/timeout) are already included by _process_step_transitions
+        # If the episode timed out, the 'done' flag needs to be true for the last transition
+        # _process_step_transitions handles the done flag correctly based on sim state and target check
 
-    def reset(self):
-        """Resets the simulation for a new episode with fixed base start and random target."""
-        self._steps_in_episode = 0
-        self.sim.reset()
+        # Log episode reward for each agent
+        # The total reward for an episode is the sum of rewards collected over steps
+        # We need to accumulate rewards per drone throughout the episode
+        # Let's add an episode_reward accumulator to each agent or store it here
+        # Store reward in _prev_step_data and sum it up per episode
 
-        # Start at the base position
-        self._state = DroneInfo(
-            id=0,
-            possition=Vector(
-                self.base_position.x, self.base_position.y, self.base_position.z
-            ),
-            velocity=Vector(),
-            angle=(0.0, 0.0, 0.0),
-            angular_velocity=(0.0, 0.0, 0.0),
-            lidars={"lidars": [0.0] * 10},  # Assume initially clear view
-            is_alive=True,
-        )
+        # Sum rewards from the last step and update episode reward accumulators
+        # Need to get final rewards for the step that ended the episode
+        final_rewards = [
+            data.get("reward", 0.0) for data in self._prev_step_data
+        ]  # Get reward calculated in the last _process_step_transitions
 
-        # Set random target position within arena bounds (avoid too close to min_y)
-        min_b, max_b = (
-            Vector(self.arena_bounds[0], self.arena_bounds[2], self.arena_bounds[4]),
-            Vector(self.arena_bounds[1], self.arena_bounds[3], self.arena_bounds[5]),
-        )
-        self._target = Vector(
-            random.uniform(min_b.x, max_b.x),
-            random.uniform(
-                min_b.y + 5.0, max_b.y - 1.0
-            ),  # Target height well above ground, below ceiling
-            random.uniform(min_b.z, max_b.z),
-        )
+        # Add logging for each drone's episode reward
+        # Need to track episode reward per drone over the episode duration
+        # Let's add episode_reward tracking here in LearnSimulation
+        episode_rewards_this_ep = [0.0] * self.num_drones
+        # This requires accumulating rewards per drone step by step.
+        # Let's adjust _process_step_transitions to return rewards and accumulate them here.
 
-        # Ensure target is not too close to the start position if needed
+        # A simpler way for logging: sum up rewards collected in buffer? No, buffer clears.
+        # Let's add episode_reward accumulators to each agent temporarily during the episode.
+        # Or just sum up rewards from the buffer *before* update? No, buffer is for batches.
+        # Best way: Accumulate rewards here in LearnSimulation step-by-step.
+
+        # Let's refactor _process_step_transitions slightly to return rewards and done flags
+        # and sum rewards here.
+
+        # Re-think learn_episod loop slightly to handle rewards and done flags properly
+        # Init accumulators: episode_rewards_this_ep = [0.0] * self.num_drones
+
+        # Inside the loop, after _process_step_transitions, which returns rewards and done flags:
+        # step_rewards, step_dones, step_statuses = self._process_step_transitions(...)
+        # for i in range(self.num_drones):
+        #     episode_rewards_this_ep[i] += step_rewards[i]
+        #     # Optionally log drone status if it just became done
+        #     if step_dones[i] and self._prev_step_data[i].get('was_alive', True): # Check if it just died/finished
+        #          print(f"  Drone {i} finished episode: Status={step_statuses[i]}")
+
+        # At the end of the episode loop (after while not stop):
+        # for i in range(self.num_drones):
+        #      self.episode_rewards[i].append(episode_rewards_this_ep[i]) # Store total episode reward for this drone
+
+        # Let's implement this more robust accumulation
+
+        # --- Revised learn_episod loop ---
+        self.sim_proxy.reset()
+        current_info = self.sim_proxy.get_drones_info()
+        self._current_targets = self._get_random_targets(ARENA_BOUNDS)
+        self._step_count = 0
+        self._prev_step_data = [{} for _ in range(self.num_drones)]
+        episode_rewards_this_ep = [0.0] * self.num_drones
+        drones_done_status = [False] * self.num_drones  # Track if each drone is done
+
         while (
-            self._state.possition.distance_to(self._target) < 10
-        ):  # Min 10m distance from start
-            self._target = Vector(
-                random.uniform(min_b.x, max_b.x),
-                random.uniform(min_b.y + 5.0, max_b.y - 1.0),
-                random.uniform(min_b.z, max_b.z),
-            )
-
-        print(
-            f"Episode started. Start: {self._state.possition}, Target: {self._target}"
-        )
-
-        # In a real simulation, you'd pass start_pos and target_pos to the sim API
-        # and get the initial state back.
-        return self.get_state(), self.get_target()
-
-    def step(self, motor_powers: list[float]):
-        """
-        Applies motor actions and advances the simulation by dt.
-        Returns next_state, reward, done, info.
-        REPLACE WITH YOUR SIMULATION'S STEP FUNCTION
-        """
-        if not self._state.is_alive:
-            # If drone is already dead, just return current state and 0 reward
-            return self._state, 0.0, True, {"status": "dead"}
-
-        self._steps_in_episode += 1
-
-        # Clamp motor powers to [0, 1]
-        motor_powers = [max(0.0, min(1.0, p)) for p in motor_powers]
-
-        # --- Simple Mock Physics Update ---
-        # Total upward thrust (sum of motor powers * scale)
-        total_thrust_force_magnitude = sum(motor_powers) * self.THRUST_SCALE
-        net_force_y = total_thrust_force_magnitude + self.GRAVITY.y
-
-        net_force = Vector(
-            -self.DRAG_COEFF * self._state.velocity.x,  # Simple drag model
-            net_force_y - self.DRAG_COEFF * self._state.velocity.y,
-            -self.DRAG_COEFF * self._state.velocity.z,
-        )
-
-        # Update velocity and position (Euler integration)
-        acceleration = Vector(
-            net_force.x, net_force.y, net_force.z
-        )  # Assuming mass = 1 for simplicity
-        self._state.velocity = Vector(
-            self._state.velocity.x + acceleration.x * self.dt,
-            self._state.velocity.y + acceleration.y * self.dt,
-            self._state.velocity.z + self._state.velocity.z * self.dt,
-        )
-        self._state.possition = Vector(
-            self._state.possition.x + self._state.velocity.x * self.dt,
-            self._state.possition.y + self._state.velocity.y * self.dt,
-            self._state.possition.z + self._state.velocity.z * self.dt,
-        )
-
-        # --- Update Lidars (Mock) ---
-        # This needs proper ray casting in a real sim.
-        # Mock: simplified check against obstacles and arena bounds.
-        # Return 0 if clear up to MAX_LIDAR_RANGE, otherwise distance <= MAX_LIDAR_RANGE
-        updated_lidars = [0.0] * 10  # Assume clear initially
-
-        # Simple check for distance to nearest point on obstacle bounding box
-        # This is a simplification; real lidars are rays from origin/orientation.
-        current_pos = self._state.possition
-        for (
-            obs_center_x,
-            obs_center_y,
-            obs_center_z,
-            size_x,
-            size_y,
-            size_z,
-        ) in self._obstacles:
-            min_obs = Vector(
-                obs_center_x - size_x / 2,
-                obs_center_y - size_y / 2,
-                obs_center_z - size_z / 2,
-            )
-            max_obs = Vector(
-                obs_center_x + size_x / 2,
-                obs_center_y + size_y / 2,
-                obs_center_z + size_z / 2,
-            )
-
-            # Find closest point on AABB to drone position (simplified)
-            closest_point_on_obs = Vector(
-                max(min_obs.x, min(max_obs.x, current_pos.x)),
-                max(min_obs.y, min(max_obs.y, current_pos.y)),
-                max(min_obs.z, min(max_obs.z, current_pos.z)),
-            )
-            dist_to_closest = (
-                current_pos.distance_to(closest_point_on_obs) - 0.5
-            )  # Subtract drone radius approx
-
-            # If within range, set lidar values (very crude approximation)
-            if dist_to_closest < MAX_LIDAR_RANGE and dist_to_closest > 0:
-                # This doesn't simulate directionality. A real sim would cast rays.
-                # Just setting all lidars to this distance if close to *any* obstacle.
-                # This is a major mock simplification.
-                updated_lidars = [
-                    min(d if d > 0 else MAX_LIDAR_RANGE, dist_to_closest)
-                    for d in updated_lidars
-                ]
-
-        # Check distance to walls/floor/ceiling
-        dist_to_floor = current_pos.y - self.arena_bounds[2]  # current_y - min_y
-        dist_to_ceiling = self.arena_bounds[3] - current_pos.y  # max_y - current_y
-        dist_to_wall_x_min = current_pos.x - self.arena_bounds[0]  # current_x - min_x
-        dist_to_wall_x_max = self.arena_bounds[1] - current_pos.x  # max_x - current_x
-        dist_to_wall_z_min = current_pos.z - self.arena_bounds[4]  # current_z - min_z
-        dist_to_wall_z_max = self.arena_bounds[5] - current_pos.z  # max_z - current_z
-
-        # Mock lidar directions (very rough map to indices)
-        # 0-7: horizontal, 8: up, 9: down
-        # Update relevant lidar readings if closer than current (or 0) and within MAX_LIDAR_RANGE
-        if dist_to_ceiling < MAX_LIDAR_RANGE and dist_to_ceiling > 0:
-            updated_lidars[8] = min(
-                updated_lidars[8] if updated_lidars[8] > 0 else MAX_LIDAR_RANGE,
-                dist_to_ceiling,
-            )
-        if dist_to_floor < MAX_LIDAR_RANGE and dist_to_floor > 0:
-            updated_lidars[9] = min(
-                updated_lidars[9] if updated_lidars[9] > 0 else MAX_LIDAR_RANGE,
-                dist_to_floor,
-            )
-        # Horizontal - need to map actual lidar angles to XZ directions
-        # This requires drone's yaw angle. Mock simplified: check nearest wall distances
-        # and assign to 'general' horizontal lidars if closer than 10.
-        horizontal_dists = [
-            dist_to_wall_x_min,
-            dist_to_wall_x_max,
-            dist_to_wall_z_min,
-            dist_to_wall_z_max,
-        ]
-        for i in range(8):  # Horizontal lidars 0-7
-            closest_wall_dist = min(horizontal_dists)  # Still not directional
-            if closest_wall_dist < MAX_LIDAR_RANGE and closest_wall_dist > 0:
-                updated_lidars[i] = min(
-                    updated_lidars[i] if updated_lidars[i] > 0 else MAX_LIDAR_RANGE,
-                    closest_wall_dist,
-                )
-
-        # Final processing: any lidar still 0 means clear up to max range (as per user info)
-        # We already initialized to 0.0, and updated only if < MAX_LIDAR_RANGE and > 0.
-        # This matches the rule: 0 if clear, otherwise distance up to 10.
-
-        self._state.lidars = {"lidars": updated_lidars}
-
-        # --- Check for Termination Conditions ---
-        done = False
-        reward = 0.0
-        status = "flying"
-
-        # 1. Check if drone is marked not alive by the *actual* simulation
-        if not self._state.is_alive:
-            reward = -5000.0  # Very large penalty for crash/death
-            done = True
-            status = "crashed_sim_alive_flag"
-            # print(f"Crashed: Sim reported dead at {self._state.possition}") # Keep logging low during training
-
-        # 2. Check for collision with arena bounds (if sim doesn't handle this via is_alive)
-        # Assuming sim handles this and sets is_alive, but as a fallback:
-        pos = self._state.possition
-        if (
-            pos.x < self.arena_bounds[0]
-            or pos.x > self.arena_bounds[1]
-            or pos.y < self.arena_bounds[2]
-            or pos.y > self.arena_bounds[3]
-            or pos.z < self.arena_bounds[4]
-            or pos.z > self.arena_bounds[5]
+            not all(drones_done_status)
+            and self._step_count < self._max_steps_per_episode
         ):
-            if (
-                self._state.is_alive
-            ):  # Only apply penalty if not already dead by sim flag
-                self._state.is_alive = False
-                reward = -5000.0  # Very large penalty
-                done = True
-                status = "crashed_bounds_fallback"
-                # print(f"Crashed: Out of bounds at {self._state.possition}")
+            self._step_count += 1
 
-        # 3. Check if target is reached (only if not crashed)
-        dist_xz = self._state.possition.distance_xz_to(self._target)
-        is_above_target_y = self._state.possition.y >= self._target.y
+            # 1. Get actions and log_probs for the *current* state of each active drone
+            all_engines = []
+            current_state_vectors = []  # Store state vectors for transitions
+            current_log_probs = []  # Store log probs for transitions
 
-        if not done and dist_xz < self.target_detection_radius and is_above_target_y:
-            reward = +2000.0  # Positive reward for reaching (scaled for larger arena)
-            done = True
-            status = "reached_target"
-            # print(f"Reached target at {self._target} at step {self._steps_in_episode}")
+            for i in range(self.num_drones):
+                if not drones_done_status[i]:  # Only get action for active drones
+                    drone_info = current_info.drones[
+                        i
+                    ]  # Assuming info is DronesInfo with .drones list
+                    target = self._current_targets[i]
+                    agent = self.agents[i]
 
-        # 4. Check for maximum steps
-        if not done and self._steps_in_episode >= self._max_steps_per_episode:
-            done = True
-            status = "timeout"
-            # print("Episode timed out")
+                    state_vector = agent.prepare_state_vector(drone_info, target)
+                    action, log_prob = agent.get_action_and_log_prob(
+                        state_vector, explore=True
+                    )
 
-        # --- Calculate Step Reward (if not terminated by crash or reach) ---
-        if not done:
-            # Reward components (adjust coefficients for 200x20x200 arena)
-            # Max XZ distance ~ sqrt(200^2 + 200^2) = sqrt(80000) ~ 280
-            # Max Y below target ~ 20
-            alpha = 0.5  # Penalty for XZ distance (was 1.0)
-            beta = 5.0  # Penalty for being below target Y (was 2.0)
-            delta = 0.05  # Time penalty per step (was 0.1)
+                    all_engines.append(action)
+                    current_state_vectors.append(state_vector)
+                    current_log_probs.append(log_prob)
 
-            # Scale distance penalty by arena diagonal for some normalization idea
-            max_arena_dist = Vector(
-                self.arena_bounds[1], self.arena_bounds[3], self.arena_bounds[5]
-            ).distance_to(
-                Vector(self.arena_bounds[0], self.arena_bounds[2], self.arena_bounds[4])
-            )
-            # reward_distance_xz = -alpha * (dist_xz / max_arena_dist) # Alternative normalization
-            reward_distance_xz = -alpha * dist_xz  # Simple linear penalty
+                    # Store pre-step data for transition (match by drone index)
+                    self._prev_step_data[i]["state_vector"] = state_vector
+                    self._prev_step_data[i]["action"] = action
+                    self._prev_step_data[i]["log_prob"] = log_prob
+                    self._prev_step_data[i]["was_active"] = (
+                        True  # Mark as active this step
+                    )
+                else:
+                    # If drone is done, send zero engines or last engines (check sim requirements)
+                    # Sending zeros is safer
+                    all_engines.append([0.0] * ACTION_SIZE)
+                    self._prev_step_data[i]["was_active"] = False  # Mark as inactive
 
-            reward_height_penalty = -beta * max(
-                0, self._target.y - self._state.possition.y
-            )
-            reward_time_penalty = -delta
+            # Ensure all_engines has 5 entries, even if some drones are done
+            if len(all_engines) < self.num_drones:
+                # This should not happen if loop is correct, but as a safeguard
+                print("Warning: all_engines incomplete. Padding with zeros.")
+                while len(all_engines) < self.num_drones:
+                    all_engines.append([0.0] * ACTION_SIZE)
 
-            reward = reward_distance_xz + reward_height_penalty + reward_time_penalty
+            # 2. Apply actions to the simulation
+            self.sim_proxy.set_drones(all_engines)
 
-        # In a real sim, this would come from the sim API: next_state, reward, done, info
-        return self._state, reward, done, {"status": status}
+            # 3. The simulation advances. Get the *next* state information
+            # Add a small delay if sim needs real time (usually not in ML training sims)
+            # time.sleep(SIMULATION_DT) # Only if your sim doesn't run in fixed steps internally
 
-    def get_state(self):
-        return self._state
+            next_info = self.sim_proxy.get_drones_info()
 
-    def get_target(self):
-        return self._target
+            # 4. Process transitions, calculate rewards, and update agents
+            # Iterate through drones to get rewards and done flags for the step that just happened
+            for i in range(self.num_drones):
+                # Only process transitions for drones that were active *before* this step
+                if self._prev_step_data[i].get("was_active", False):
+                    drone_info = current_info.drones[i]  # State *before* action
+                    next_drone_info = next_info.drones[i]  # State *after* action
+                    target = self._current_targets[i]
+                    agent = self.agents[i]
 
-    def get_state_size(self):
-        return 3 + 3 + 3 + 3 + 10 + 3 + 1
+                    # Calculate reward and done for this specific drone
+                    reward, done, status = self._calculate_reward_and_done(
+                        next_drone_info, target, self._step_count
+                    )
 
-    def get_action_size(self):
-        return 8
+                    # Accumulate episode reward
+                    episode_rewards_this_ep[i] += reward
 
+                    # Store the full transition for the agent's buffer
+                    # Retrieve the pre-step data
+                    state_vector = self._prev_step_data[i]["state_vector"]
+                    action = self._prev_step_data[i]["action"]
+                    log_prob = self._prev_step_data[i]["log_prob"]
+                    next_state_vector = agent.prepare_state_vector(
+                        next_drone_info, target
+                    )  # Prepare next state vector
 
-# --- PPO Specific Components ---
-# Using a simplified Actor that outputs mean only and adding noise manually for exploration.
-# For a proper PPO implementation with continuous actions, the Actor should output
-# mean and stddev, and actions should be sampled from the resulting distribution.
-# Log probability calculation is crucial and complex with action clipping.
-# The code below uses a simplified log_prob calculation that might be inaccurate
-# when actions are clipped. Consider using a library like TF-Agents or Stable-Baselines3
-# for production-level PPO.
+                    # Store transition in the agent's buffer
+                    agent.store_transition(
+                        state_vector, action, reward, next_state_vector, done, log_prob
+                    )
 
+                    # Update drone's done status
+                    if done:
+                        drones_done_status[i] = True
+                        # print(f"  Drone {i} finished at step {self._step_count}: Status={status}, Reward={episode_rewards_this_ep[i]:.2f}")
 
-# --- Training Loop ---
-if __name__ == "__main__":
-    # Define training parameters
-    TOTAL_EPISODES = 10000  # Increased episodes for larger arena
-    SAVE_INTERVAL = 200  # Save weights every N episodes
-    LOG_INTERVAL = 10  # Print log every N episodes
+            # Update current info for the next iteration of the while loop
+            current_info = next_info
 
-    # Create the RL agent
-    agent = PPOAgent(
-        state_size=3
-        + 3
-        + 3
-        + 3
-        + 10
-        + 3
-        + 1,  # pos, vel, angle, ang_vel, lidars, target_vec, dist
-        action_size=8,  # motor powers
-        arena_bounds=ARENA_BOUNDS,
-        dt=SIMULATION_DT,
-        base_position=BASE_POSITION,
-    )
-
-    # Start training
-    print("Starting training...")
-    episode_rewards = deque(maxlen=100)  # To track recent average reward
-
-    for episode in range(1, TOTAL_EPISODES + 1):
-        # Reset environment for a new episode (fixed start, random target)
-        current_state, target = agent.sim.reset()
-        done = False
-        episode_reward = 0
-        step_count = 0
-
-        while not done:
-            # Prepare state vector for the model
-            state_vector = agent.prepare_state_vector(current_state, target)
-
-            # Select action using the agent's policy (with exploration) and get log_prob
-            action, log_prob = agent.get_action_and_log_prob(state_vector, explore=True)
-
-            # Perform the action in the simulation
-            # REPLACE agent.sim.step() WITH YOUR ACTUAL SIMULATION'S STEP FUNCTION
-            next_state, reward, done, info = agent.sim.step(action)
-
-            # Prepare next state vector for buffer
-            next_state_vector = agent.prepare_state_vector(next_state, target)
-
-            # Store the transition in the agent's buffer
-            agent.store_transition(
-                state_vector, action, reward, next_state_vector, done, log_prob
-            )
-
-            current_state = next_state
-            episode_reward += reward
-            step_count += 1
-
-            # If buffer is full or episode ends, perform a model update
-            # PPO often updates after collecting a fixed number of steps across multiple environments
-            # In a single-environment setup, update when buffer reaches batch_size or episode ends
-            if len(agent.buffer) >= agent.batch_size or done:
-                if (
-                    len(agent.buffer) >= 10
-                ):  # Only update if buffer has some data, even if episode ends early
+            # Check if any agent buffer is full and perform update
+            # Updating multiple agents in one simulation step can be done here.
+            # If batch_size is reached for an agent, update its model.
+            for i, agent in enumerate(self.agents):
+                # Check buffer size and ensure there are enough experiences for a meaningful update
+                # PPO updates are typically done on batches of experience collected over several steps/episodes.
+                # Updating *within* the episode after batch_size is reached is a common strategy.
+                if len(agent.buffer) >= agent.batch_size:
+                    # print(f"Agent {i} buffer full ({len(agent.buffer)}). Updating models...")
                     agent.update_models()
 
-        # Log episode results
-        episode_rewards.append(episode_reward)
-        average_reward = np.mean(episode_rewards)
+        # --- End of Episode ---
+        # When the while loop finishes (all drones done or max steps reached)
+        # Add total episode reward to tracking deque for each drone
+        for i in range(self.num_drones):
+            self.episode_rewards[i].append(episode_rewards_this_ep[i])
+            # If a drone didn't finish (e.g., others finished or timeout), make sure its last transition is marked as done
+            # This is handled if _calculate_reward_and_done sets done=True on timeout or crash
 
-        if episode % LOG_INTERVAL == 0:
+        return episode_steps  # Return how many steps the episode took
+
+    def _get_actions_for_drones(
+        self, info: DronesInfo, targets: list[Vector]
+    ) -> list[list[float]]:
+        """Calculates motor commands for all drones using their respective agents."""
+        all_engines = []
+        # Assuming info.drones is a list of DroneInfo, ordered by drone index (0 to 4)
+        for i in range(self.num_drones):
+            drone_info = info.drones[i]
+            target = targets[i]
+            agent = self.agents[i]  # Get the specific agent for this drone
+
+            # Get action from the agent (with exploration during training)
+            # The method get_action_and_log_prob also stores log_prob if needed for PPO
+            # We store the action and log_prob in _prev_step_data *before* the sim step
+            # Use explore=True during training
+            # action, log_prob = agent.get_action_and_log_prob(agent.prepare_state_vector(drone_info, target), explore=True)
+            # The get_action_and_log_prob method in PPOAgent should return action and log_prob
+            # and not store the transition itself. Storage happens *after* getting reward/next_state.
+
+            # So, here we get action and log_prob, and *store* them in _prev_step_data
+            state_vector = agent.prepare_state_vector(drone_info, target)
+            action, log_prob = agent.get_action_and_log_prob(state_vector, explore=True)
+
+            all_engines.append(action)
+            # Store pre-step info for processing the transition *after* sim step
+            # This is handled directly in the main loop now
+
+        return all_engines
+
+    def _calculate_reward_and_done(
+        self, drone_info: DroneInfo, target: Vector, current_step: int
+    ):
+        """Calculates reward and done status for a single drone."""
+        pos = drone_info.possition
+        is_alive = drone_info.is_alive
+
+        # Check if target is reached
+        dist_xz = pos.distance_xz_to(target)
+        is_above_target_y = pos.y >= target.y
+        target_reached = dist_xz < TARGET_DETECTION_RADIUS and is_above_target_y
+
+        # Check termination conditions
+        done = False
+        status = "flying"
+        reward = 0.0
+
+        if not is_alive:
+            # Crash penalty (sim reported not alive)
+            reward = -REWARD_PENALTY_CRASH
+            done = True
+            status = "crashed"
+        elif target_reached:
+            # Target reached bonus
+            reward = REWARD_BONUS_REACH
+            done = True
+            status = "reached_target"
+        elif current_step >= self._max_steps_per_episode:
+            # Timeout penalty (or just end episode without extra penalty if desired)
+            # Let's add a small penalty on timeout if target wasn't reached
+            if not target_reached:  # Should be true if it's a timeout and not reached
+                reward = (
+                    -REWARD_PENALTY_CRASH * 0.1
+                )  # Smaller penalty for timeout vs crash
+            done = True
+            status = "timeout"
+        else:
+            # Step reward (progress towards goal + time penalty)
+            reward_distance_xz = -REWARD_COEFF_DISTANCE_XZ * dist_xz
+            reward_height_penalty = -REWARD_COEFF_HEIGHT_PENALTY * max(
+                0, target.y - pos.y
+            )
+            reward_time_penalty = -REWARD_COEFF_TIME
+
+            reward = reward_distance_xz + reward_height_penalty + reward_time_penalty
+            status = "flying"  # Keep status as flying if not terminated
+
+        return reward, done, status
+
+    def _stop_episod(self, info: DronesInfo, targets: list[Vector]) -> bool:
+        """
+        Checks if the episode should stop.
+        Episode stops if ALL drones are either crashed or at their target.
+        Also stops if max steps per episode is reached (handled in learn_episod loop).
+        """
+        all_drones_done = True
+        # Assuming info.drones is a list of DroneInfo, ordered by drone index
+        for i in range(self.num_drones):
+            drone_info = info.drones[i]
+            target = targets[i]
+
+            if drone_info.is_alive:  # If the drone is still alive
+                # Check if it has reached its target
+                dist_xz = drone_info.possition.distance_xz_to(target)
+                is_above_target_y = drone_info.possition.y >= target.y
+                target_reached = dist_xz < TARGET_DETECTION_RADIUS and is_above_target_y
+
+                if not target_reached:
+                    # If drone is alive and hasn't reached its target, episode is NOT over yet
+                    all_drones_done = False
+                    break  # No need to check other drones
+
+        # The timeout check is handled in the calling learn_episod loop
+        return all_drones_done  # True if all are crashed or reached target
+
+    def _get_random_targets(self, arena_bounds: tuple[float]) -> list[Vector]:
+        """Generates random targets within arena bounds."""
+        min_b, max_b = (
+            Vector(arena_bounds[0], arena_bounds[2], arena_bounds[4]),
+            Vector(arena_bounds[1], arena_bounds[3], arena_bounds[5]),
+        )
+        targets = []
+        for _ in range(self.num_drones):
+            target = Vector(
+                random.uniform(min_b.x, max_b.x),
+                random.uniform(
+                    min_b.y + 5.0, max_b.y - 1.0
+                ),  # Target height well above ground, below ceiling
+                random.uniform(min_b.z, max_b.z),
+            )
+            # Optional: Ensure targets are not too close to BASE_POSITION or each other
+            while target.distance_to(BASE_POSITION) < 20:  # Min 20m from base
+                target = Vector(
+                    random.uniform(min_b.x, max_b.x),
+                    random.uniform(min_b.y + 5.0, max_b.y - 1.0),
+                    random.uniform(min_b.z, max_b.z),
+                )
+            targets.append(target)
+        return targets
+
+    def save(self, episode_num: int):
+        """Saves the weights of all agents."""
+        print(f"Saving model weights at episode {episode_num}...")
+        for i, agent in enumerate(self.agents):
+            agent.save_weights(agent.save_dir)
+        print("All agents' weights saved.")
+
+    def log(self, episode_num: int, total_steps: int, episode_duration: float):
+        """Logs training progress."""
+        print(f"\n--- Episode {episode_num} ---")
+        print(f"Total Steps: {total_steps}")
+        print(f"Episode Duration: {episode_duration:.2f} seconds")
+
+        for i in range(self.num_drones):
+            avg_reward = (
+                np.mean(self.episode_rewards[i]) if self.episode_rewards[i] else 0.0
+            )
             print(
-                f"Episode {episode}/{TOTAL_EPISODES} | Avg Reward: {average_reward:.2f} | Last Reward: {episode_reward:.2f} | Steps: {step_count} | Status: {info.get('status', 'unknown')}"
+                f"  Drone {i}: Recent Avg Episode Reward ({len(self.episode_rewards[i])} eps): {avg_reward:.2f}"
             )
 
-        # Save model weights periodically
-        if episode % SAVE_INTERVAL == 0:
-            agent.save_weights(agent.save_dir)
-        break
+        # You might want to log other metrics, like success rate, crash rate etc.
+        # This requires tracking episode outcomes (_stop_episod status) per drone.
+        # You could add counters for reached_target, crashed, timeout in _calculate_reward_and_done
+        # and display them here.
 
-    print("Training finished.")
-    # Save final weights
-    agent.save_weights(agent.save_dir)
+
+# --- Main Execution ---
+if __name__ == "__main__":
+    # Instantiate your actual simulation proxy
+    # Ensure this connects to your sim and provides required methods:
+    # sim.reset() -> Resets all drones, environment etc.
+    # sim.get_drones_info() -> Returns DronesInfo (list of DroneInfo for 5 drones)
+    # sim.set_drones(list[list[float]]) -> Takes list of 8 motor values for each of 5 drones
+    # Note: The actual simulation needs to handle the physics step after set_drones.
+    # The next get_drones_info() should reflect the state *after* that physics step.
+
+    try:
+        # Example of how you might instantiate your sim proxy
+        print("Connecting to simulation...")
+        s = Simulation()
+        # s.connect_to_server() # Uncomment if your sim requires explicit connection
+        print("Simulation connected.")
+
+        # Instantiate the learning manager
+        l = LearnSimulation(s, num_drones=5)
+
+        # Start the training process
+        l.start_learning(
+            episodes=10000, save_interval=500, log_interval=50
+        )  # Adjusted intervals for potentially longer training
+
+    except Exception as e:
+        print(f"\nAn error occurred during simulation or training: {e}")
+        import traceback
+
+        traceback.print_exc()
