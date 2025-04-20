@@ -183,22 +183,6 @@ class DroneExecutor:
     # наклон изменяет угол
     def __init__(self, drone):
         self.drone = drone
-        self.altitude_pid = PIDController(
-            Kp=0.2,
-            Ki=0.4,
-            Kd=0.9,
-            setpoint=self.drone.my_height,
-            output_limits=(0, 0.8),
-        )
-        pitch_yaw_pid_params = {
-            "Kp": 0.01,
-            "Ki": 0.01,
-            "Kd": 0.01,
-            "setpoint": 0.0,
-            "output_limits": (0.0, 0.3),
-        }
-        self.pitch_pid = PIDController(**pitch_yaw_pid_params)
-        self.yaw_pid = PIDController(**pitch_yaw_pid_params)
         self.attitude_motor = t = 0.6
         self.engines_effects = [
             Vector(*i, z=1)
@@ -214,7 +198,7 @@ class DroneExecutor:
             ]
         ]  # 7
         # pitch roll
-        # --- Параметры управления ---
+        # --- Параметры управления --sssssssssssssss
         self.max_tilt_angle = 20.0
 
         self.lidar_effects = {
@@ -229,54 +213,15 @@ class DroneExecutor:
             "up": Vector(0, -1, 0),
             "d": Vector(0, 1, 0),
         }
-        self.lidar_mult = 25
-        self.last_correction = None
         for k, v in self.lidar_effects.items():
             self.lidar_effects[k] = v.normalize()
-
-    def get_altitude_correction(self, target_height: float, dt: float) -> list[float]:
-        self.altitude_pid.setpoint = target_height
-        return np.full(
-            8,
-            self.altitude_pid.update(self.drone.params.possition.y, dt),
-            dtype=np.float64,
-        )
-
-    def get_pitch_correction(
-        self, direction: Vector, target_speed: float, dt: float
-    ) -> list[float]:
-        cur_angle = self.drone.params.angle[0]
-        val = direction.z / direction.length() * self.max_tilt_angle
-        self.pitch_pid.setpoint = val
-        currection = self.pitch_pid.update(cur_angle, dt)
-
-        return np.array([1, 1, 0, 0, -1, -1, 0, 0]) * currection
-
-    def get_yaw_correction(
-        self, direction: Vector, target_speed: float, dt: float
-    ) -> list[float]:
-        cur_angle = self.drone.params.angle[2]
-        val = -direction.x / direction.length() * self.max_tilt_angle
-        self.yaw_pid.setpoint = val
-        currection = self.yaw_pid.update(cur_angle, dt)
-
-        return np.array([0, 0, 1, 1, 0, 0, -1, -1]) * currection
+        self.lidar_mult = 25
 
     def move_to_direction(
         self, direction: Vector, target_height: float, target_speed: float, dt: float
     ) -> list[float]:
         engines = np.zeros(8)
-        print(direction)
-        print(self.drone.params.lidars)
-        # lidar_correction = self.correct_from_lidars(direction, dt)
-        lidar_correction = Vector()
-        direciton_correction = direction - lidar_correction
-        print(direciton_correction)
-        engines += self.get_altitude_correction(target_height, dt)
-        # engines += self.get_pitch_correction(direciton_correction, target_speed, dt)
-        # engines += self.get_yaw_correction(direciton_correction, target_speed, dt)
 
-        engines = np.clip(engines, 0, 1)
         return engines
 
     def correct_from_lidars(self, direction: Vector, dt: float) -> Vector:
