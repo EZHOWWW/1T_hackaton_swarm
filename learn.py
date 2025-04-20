@@ -26,12 +26,12 @@ from solution.RL.model import (
 
 # --- Simulation Parameters ---
 ARENA_BOUNDS = (
-    -100,
-    100,
+    -150,
+    150,
     0,
-    20,
-    -100,
-    100,
+    15,
+    -150,
+    150,
 )  # (min_x, max_x, min_y, max_y, min_z, max_z)
 SIMULATION_DT = 0.1  # Time step
 BASE_POSITION = Vector(
