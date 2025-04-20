@@ -9,11 +9,21 @@ from solution.simulation import DroneInfo
 
 # Import the model creation functions (we will create models directly in PPOAgent)
 from solution.executor import create_actor_model, create_critic_model, MAX_LIDAR_RANGE
-from learn import MockSimulation
 
 
 class PPOAgent:
-    def __init__(self, state_size, action_size, arena_bounds, dt, base_position):
+    def __init__(
+        self,
+        state_size,
+        action_size,
+        arena_bounds,
+        dt,
+        base_position,
+        target_detection_radius,
+        ppo_epochs,
+        batch_size,
+        save_dir,
+    ):
         self.state_size = state_size
         self.action_size = action_size
 
@@ -49,15 +59,10 @@ class PPOAgent:
         self.buffer = deque(maxlen=self.batch_size * 2)  # Use deque for max length
 
         # Instantiate the mock simulation
-        self.sim = MockSimulation(
-            arena_bounds=arena_bounds,
-            dt=dt,
-            base_position=base_position,
-            target_detection_radius=TARGET_DETECTION_RADIUS,
-        )
+        self.target_detection_radius = target_detection_radius
 
         # Directory to save models
-        self.save_dir = "./drone_rl_models"
+        self.save_dir = save_dir
         os.makedirs(self.save_dir, exist_ok=True)
 
         # Load weights if available
@@ -119,9 +124,11 @@ class PPOAgent:
     def get_action_and_log_prob(self, state_vector, explore=True):
         """Gets action by sampling from a Gaussian centered at actor mean (with noise for exploration)
         and calculates approximate log probability."""
-        state_vector = state_vector.reshape(1, -1)  # Add batch dimension
+        # state_vector = state_vector.reshape(1, -1)  # Add batch dimension
+        state_vector = np.expand_dims(state_vector, axis=0)  # Преобразует (n,) в (1, n)
 
         # Get the mean action from the actor
+        print("State vector shape:", state_vector.shape)
         mean_action = self.actor(state_vector)[0]  # Shape (8,)
         mean_action_np = mean_action.numpy()  # Convert to numpy
 

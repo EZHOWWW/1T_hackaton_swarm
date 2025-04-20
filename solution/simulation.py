@@ -31,6 +31,9 @@ class DroneInfo:
     is_alive: bool = True
 
 
+DronesInfo = list[DroneInfo]
+
+
 def parse_drone_data(i: dict) -> DroneInfo:
     def parse_vector(v: dict) -> tuple[float, float, float]:
         return (v["x"], v["y"], v["z"])

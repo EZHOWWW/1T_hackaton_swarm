@@ -364,7 +364,7 @@ class LearnSimulation:
         all_engines = []
         # Assuming info.drones is a list of DroneInfo, ordered by drone index (0 to 4)
         for i in range(self.num_drones):
-            drone_info = info.drones[i]
+            drone_info = info[i]
             target = targets[i]
             agent = self.agents[i]  # Get the specific agent for this drone
 
@@ -513,22 +513,15 @@ class LearnSimulation:
         # and display them here.
 
 
-# --- Main Execution ---
-if __name__ == "__main__":
-    # Instantiate your actual simulation proxy
-    # Ensure this connects to your sim and provides required methods:
-    # sim.reset() -> Resets all drones, environment etc.
-    # sim.get_drones_info() -> Returns DronesInfo (list of DroneInfo for 5 drones)
-    # sim.set_drones(list[list[float]]) -> Takes list of 8 motor values for each of 5 drones
-    # Note: The actual simulation needs to handle the physics step after set_drones.
-    # The next get_drones_info() should reflect the state *after* that physics step.
-
+async def main():
     try:
         # Example of how you might instantiate your sim proxy
         print("Connecting to simulation...")
         s = Simulation()
-        # s.connect_to_server() # Uncomment if your sim requires explicit connection
+        await s.connect_to_server()
+        # Uncomment if your sim requires explicit connection
         print("Simulation connected.")
+        s.get_fireplaces_info()
 
         # Instantiate the learning manager
         l = LearnSimulation(s, num_drones=5)
@@ -543,3 +536,17 @@ if __name__ == "__main__":
         import traceback
 
         traceback.print_exc()
+
+
+# --- Main Execution ---
+if __name__ == "__main__":
+    # Instantiate your actual simulation proxy
+    # Ensure this connects to your sim and provides required methods:
+    # sim.reset() -> Resets all drones, environment etc.
+    # sim.get_drones_info() -> Returns DronesInfo (list of DroneInfo for 5 drones)
+    # sim.set_drones(list[list[float]]) -> Takes list of 8 motor values for each of 5 drones
+    # Note: The actual simulation needs to handle the physics step after set_drones.
+    # The next get_drones_info() should reflect the state *after* that physics step.
+    import asyncio
+
+    asyncio.run(main())

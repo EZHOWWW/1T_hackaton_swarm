@@ -58,3 +58,6 @@ class Vector:
 
     def __neg__(self):
         return Vector(-self.x, -self.y, -self.z)
+
+    def distance_to(self, other) -> float:
+        return (other - self).length()
