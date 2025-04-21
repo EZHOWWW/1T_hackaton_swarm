@@ -21,6 +21,8 @@ class Swarm:
         start = time.time()
         while True:
             self.update_drones_info()
+            if not self.any_drone_alive():
+                break
             dt = time.time() - start
             start = time.time()
             for u in self.units:
