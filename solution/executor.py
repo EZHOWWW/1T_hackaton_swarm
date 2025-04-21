@@ -189,14 +189,14 @@ class DroneExecutor:
             output_limits=(0, 0.8),
         )
         pitch_yaw_pid_params = {
-            "Kp": 0.05,
-            "Ki": 0.8,
-            "Kd": 0.2,
+            "Kp": 1,
+            "Ki": 1.3,
+            "Kd": 0.7,
             "setpoint": 0.0,
-            "integral_limits": (-1, 1),
-            "output_limits": (-0.5, +1),
+            "integral_limits": None,
+            "output_limits": (-0.9, +0.9),
         }
-        self.max_tilt_angle = 15.0
+        self.max_tilt_angle = 30
         # TODO best params
         # -----------
 
@@ -205,10 +205,10 @@ class DroneExecutor:
         self.yaw_pid = PIDController(**pitch_yaw_pid_params)
 
         self._safety_radius = (
-            4.0  # Радиус безопасности use in self.correct_direction_from_other_drones
+            3.0  # Радиус безопасности use in self.correct_direction_from_other_drones
         )
         self._repulsion_strength = (
-            20.0  # Сила отталкивания use in self.correct_direction_from_other_drones
+            10.0  # Сила отталкивания use in self.correct_direction_from_other_drones
         )
 
     def get_pitch_correction(
@@ -218,8 +218,8 @@ class DroneExecutor:
         target_speed: float,
         dt: float,
     ):
-        forwared_vec = Vector(1, 0, 0).normalize()
-        direction = target_up
+        forwared_vec = self.get_forwored_vec()
+        direction = target_up.normalize()
         setpoint = forwared_vec.dot(direction)
         # setpoint = direction.x
         self.pitch_pid.setpoint = setpoint
@@ -240,11 +240,11 @@ class DroneExecutor:
         target_speed: float,
         dt: float,
     ):
-        forwared_vec = Vector(0, 0, +1).normalize()
-        direction = target_up
-        setpoint = forwared_vec.dot(direction)
+        right_vec = self.get_right_vec()
+        direction = target_up.normalize()
+        setpoint = right_vec.dot(direction)
         self.yaw_pid.setpoint = setpoint
-        measurement = forwared_vec.dot(current_up_vector)
+        measurement = right_vec.dot(current_up_vector)
         impact = self.yaw_pid.update(measurement, dt)
 
         # print(
@@ -290,15 +290,15 @@ class DroneExecutor:
     def correct_direction(
         self, direction: Vector, target_speed: float, dt: float
     ) -> Vector:
-        # direction = self.correct_direction_from_lidars(
-        #     direction, self.drone.params.lidars, dt
-        # )
-        # direction = self.correct_direction_from_other_drones(
-        #     direction,
-        #     self.drone.params.possition,
-        #     [i.params.possition for i in self.drone.swarm.units],
-        #     dt,
-        # )
+        direction = self.correct_direction_from_lidars(
+            direction, self.drone.params.lidars, dt
+        )
+        direction = self.correct_direction_from_other_drones(
+            direction,
+            self.drone.params.possition,
+            [i.params.possition for i in self.drone.swarm.units],
+            dt,
+        )
         direction = self.correct_gravity(direction, target_speed, dt)
         return direction
 
@@ -435,3 +435,197 @@ class DroneExecutor:
         up_global = R @ up_local
 
         return Vector(*up_global)
+
+    def get_forwored_vec(self, rotate: list[float] | None = None) -> Vector:
+        """
+        Вычисляет единичный вектор, направленный вперед, на основе углов Эйлера дрона.
+
+        Args:
+            rotate: Список из трех углов (тангаж, рысканье, крен) в градусах.
+                    Порядок: [тангаж (pitch), рысканье (yaw), крен (roll)].
+
+        Returns:
+            Единичный вектор (numpy array) [x, y, z], представляющий направление "вперед".
+        """
+        if rotate is None:
+            rotate = self.drone.params.angle
+        pitch_rad = np.deg2rad(rotate[2])
+        yaw_rad = np.deg2rad(rotate[1])
+        roll_rad = np.deg2rad(rotate[0])
+
+        # Матрицы вращения вокруг осей X, Y и Z
+        Rx = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(pitch_rad), -np.sin(pitch_rad)],
+                [0, np.sin(pitch_rad), np.cos(pitch_rad)],
+            ]
+        )
+
+        Ry = np.array(
+            [
+                [np.cos(yaw_rad), 0, np.sin(yaw_rad)],
+                [0, 1, 0],
+                [-np.sin(yaw_rad), 0, np.cos(yaw_rad)],
+            ]
+        )
+
+        Rz = np.array(
+            [
+                [np.cos(roll_rad), -np.sin(roll_rad), 0],
+                [np.sin(roll_rad), np.cos(roll_rad), 0],
+                [0, 0, 1],
+            ]
+        )
+        # Матрица вращения, представляющая ориентацию дрона (в мировых координатах)
+        # Порядок умножения матриц важен: сначала крен, затем тангаж, затем рысканье (ZYX)
+        R = Ry @ Rx @ Rz
+
+        forward_local = np.array([1, 0, 0])
+
+        forward_global = R @ forward_local
+
+        return Vector(*forward_global)
+
+    def get_right_vec(self, rotate: list[float] | None = None) -> Vector:
+        """
+        Вычисляет единичный вектор, направленный вправо, на основе углов Эйлера дрона.
+
+        Args:
+            rotate: Список из трех углов (тангаж, рысканье, крен) в градусах.
+                    Порядок: [тангаж (pitch), рысканье (yaw), крен (roll)].
+
+        Returns:
+            Единичный вектор (numpy array) [x, y, z], представляющий направление "вправо".
+        """
+        if rotate is None:
+            rotate = self.drone.params.angle
+        pitch_rad = np.deg2rad(rotate[2])
+        yaw_rad = np.deg2rad(rotate[1])
+        roll_rad = np.deg2rad(rotate[0])
+
+        # Матрицы вращения вокруг осей X, Y и Z
+        Rx = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(pitch_rad), -np.sin(pitch_rad)],
+                [0, np.sin(pitch_rad), np.cos(pitch_rad)],
+            ]
+        )
+
+        Ry = np.array(
+            [
+                [np.cos(yaw_rad), 0, np.sin(yaw_rad)],
+                [0, 1, 0],
+                [-np.sin(yaw_rad), 0, np.cos(yaw_rad)],
+            ]
+        )
+
+        Rz = np.array(
+            [
+                [np.cos(roll_rad), -np.sin(roll_rad), 0],
+                [np.sin(roll_rad), np.cos(roll_rad), 0],
+                [0, 0, 1],
+            ]
+        )
+        # Матрица вращения, представляющая ориентацию дрона (в мировых координатах)
+        # Порядок умножения матриц важен: сначала крен, затем тангаж, затем рысканье (ZYX)
+        R = Ry @ Rx @ Rz
+
+        right_local = np.array([0, 0, 1])
+
+        right_global = R @ right_local
+
+        return Vector(*right_global)
+
+    def up_to_forwored(self, vector_up: Vector) -> Vector:
+        """
+        Преобразует вектор, направленный вверх в локальной системе координат дрона,
+        в вектор, направленный вперед в мировой системе координат.
+
+        Args:
+            vector_up: Единичный вектор (numpy array) [x, y, z], представляющий направление "вверх"
+                       в локальной системе координат дрона (обычно [0, 1, 0]).
+
+        Returns:
+            Единичный вектор (numpy array) [x, y, z], представляющий направление "вперед"
+            в мировой системе координат.
+        """
+        rotate = self.drone.params.angle
+        pitch_rad = np.deg2rad(rotate[2])
+        yaw_rad = np.deg2rad(rotate[1])
+        roll_rad = np.deg2rad(rotate[0])
+
+        Rx = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(pitch_rad), -np.sin(pitch_rad)],
+                [0, np.sin(pitch_rad), np.cos(pitch_rad)],
+            ]
+        )
+
+        Ry = np.array(
+            [
+                [np.cos(yaw_rad), 0, np.sin(yaw_rad)],
+                [0, 1, 0],
+                [-np.sin(yaw_rad), 0, np.cos(yaw_rad)],
+            ]
+        )
+
+        Rz = np.array(
+            [
+                [np.cos(roll_rad), -np.sin(roll_rad), 0],
+                [np.sin(roll_rad), np.cos(roll_rad), 0],
+                [0, 0, 1],
+            ]
+        )
+        R = Ry @ Rx @ Rz
+        forward_local = np.array([1, 0, 0])
+        forward_global = R @ forward_local
+        return Vector(*forward_global)
+
+    def up_to_right(self, vector_up: Vector) -> Vector:
+        """
+        Преобразует вектор, направленный вверх в локальной системе координат дрона,
+        в вектор, направленный вправо в мировой системе координат.
+
+        Args:
+            vector_up: Единичный вектор (numpy array) [x, y, z], представляющий направление "вверх"
+                       в локальной системе координат дрона (обычно [0, 1, 0]).
+
+        Returns:
+            Единичный вектор (numpy array) [x, y, z], представляющий направление "вправо"
+            в мировой системе координат.
+        """
+        rotate = self.drone.params.angle
+        pitch_rad = np.deg2rad(rotate[2])
+        yaw_rad = np.deg2rad(rotate[1])
+        roll_rad = np.deg2rad(rotate[0])
+
+        Rx = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(pitch_rad), -np.sin(pitch_rad)],
+                [0, np.sin(pitch_rad), np.cos(pitch_rad)],
+            ]
+        )
+
+        Ry = np.array(
+            [
+                [np.cos(yaw_rad), 0, np.sin(yaw_rad)],
+                [0, 1, 0],
+                [-np.sin(yaw_rad), 0, np.cos(yaw_rad)],
+            ]
+        )
+
+        Rz = np.array(
+            [
+                [np.cos(roll_rad), -np.sin(roll_rad), 0],
+                [np.sin(roll_rad), np.cos(roll_rad), 0],
+                [0, 0, 1],
+            ]
+        )
+        R = Ry @ Rx @ Rz
+        right_local = np.array([0, 0, 1])
+        right_global = R @ right_local
+        return Vector(*right_global)
