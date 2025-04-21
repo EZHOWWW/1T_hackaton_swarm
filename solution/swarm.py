@@ -39,15 +39,15 @@ class Swarm:
     def get_home_pos(self, target: Vector) -> Vector:def get_home_pos(target: Vector) -> Vector:
         # Определяем вершины параллелепипеда
         p1 = Vector(-74, 0, 78)
-        p2 = Vector(-74, 6, 72)
-        p3 = Vector(-80, 6, 72)
+        p2 = Vector(-74, 1000, 72)
+        p3 = Vector(-80, 1000, 72)
         p4 = Vector(-80, 0, 78)
         
         # Параметры параллелепипеда
         min_x = min(p1.x, p2.x, p3.x, p4.x)
         max_x = max(p1.x, p2.x, p3.x, p4.x)
-        min_y = 0
-        max_y = 6
+        min_y = min(p1.y, p2.y, p3.y, p4.y)
+        max_y = max(p1.y, p2.y, p3.y, p4.y)
         min_z = min(p1.z, p2.z, p3.z, p4.z)
         max_z = max(p1.z, p2.z, p3.z, p4.z)
         
