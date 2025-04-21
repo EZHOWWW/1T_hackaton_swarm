@@ -291,8 +291,29 @@ class DroneExecutor:
     def correct_direction_from_lidars(
         self, direction: Vector, lidars: dict, dt: float
     ) -> Vector:
-        # TODO
-        return direction
+        
+        if not lidars:
+            return direction
+
+        OBSTACLE_THRESHOLD = 3.0  # Минимальное безопасное расстояние (метры)
+        AVOIDANCE_FORCE = 1.5     # Коэффициент силы избегания
+
+        avoidance_vector = Vector(0, 0, 0)
+        
+        for lidar_dir, distance in lidars.items():
+            if distance < OBSTACLE_THRESHOLD:
+                # Нормализованный вектор от препятствия к дрону
+                obstacle_dir = Vector.from_string(lidar_dir).normalize()
+                
+                # Сила избегания (обратно пропорциональна расстоянию)
+                force_magnitude = AVOIDANCE_FORCE * (1 - distance/OBSTACLE_THRESHOLD)
+                avoidance_vector += obstacle_dir * force_magnitude
+
+        # Комбинируем исходное направление и вектор избегания
+        combined_dir = direction.replace(y=0) + avoidance_vector
+        
+        # Сохраняем горизонтальную составляющую и нормализуем
+        return combined_dir.replace(y=0).normalize()
 
     def correct_height_from_lidars(
         self, direction: Vector, lidars: dict, dt: float
