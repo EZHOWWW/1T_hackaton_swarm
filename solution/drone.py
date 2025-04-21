@@ -47,7 +47,7 @@ class Drone:
         self.need_drop: bool = False
 
         # self.my_height = self.id * 3 + 14
-        self.my_height = 8
+        self.my_height = 12
         self.executor = DroneExecutor(self)
 
     def update(self, dt: float):
@@ -79,16 +79,16 @@ class Drone:
             self.go_to(fireplace_task, dt)
 
     def go_to_home(self, home_task: GoToHome, dt: float):
-        # TODO
-        pass
+        pos = home_task.pos
+        self.engines = self.executor.move_to(pos, 5, 1, dt)
 
     def go_to(self, go_to_task: GoToTask, dt: float):
-        # pos = go_to_task.pos
-        pos = Vector(-77, 0.5, 68)
+        pos = go_to_task.pos
         self.engines = self.executor.move_to(pos, self.my_height, 1, dt)
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
         """Ищет ближайший свободный и активный камин и назначает его себе."""
+        # return Vector(-77, 10, 68)
         best_fp_index = -1
         min_dist = float("inf")
 

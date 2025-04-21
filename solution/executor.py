@@ -189,14 +189,14 @@ class DroneExecutor:
             output_limits=(0, 0.8),
         )
         pitch_yaw_pid_params = {
-            "Kp": 0.4,
-            "Ki": 1.0,
-            "Kd": 0.1,
+            "Kp": 0.05,
+            "Ki": 0.8,
+            "Kd": 0.2,
             "setpoint": 0.0,
-            "integral_limits": None,
-            "output_limits": (-0.5, 1.0),
+            "integral_limits": (-1, 1),
+            "output_limits": (-0.5, +1),
         }
-        self.max_tilt_angle = 10.0
+        self.max_tilt_angle = 15.0
         # TODO best params
         # -----------
 
@@ -263,6 +263,7 @@ class DroneExecutor:
         self, target: Vector, target_height: float, target_speed: float, dt: float
     ) -> list[float]:
         direction = self.drone.params.possition - target
+        print(direction)
         direction = Vector(x=direction.z, y=0, z=direction.x).normalize()
 
         engines = np.zeros(8)
@@ -289,43 +290,22 @@ class DroneExecutor:
     def correct_direction(
         self, direction: Vector, target_speed: float, dt: float
     ) -> Vector:
-        direction = self.correct_direction_from_lidars(
-            direction, self.drone.params.lidars, dt
-        )
-        direction = self.correct_direction_from_other_drones(
-            direction,
-            self.drone.params.possition,
-            [i.params.possition for i in self.drone.swarm.units],
-            dt,
-        )
+        # direction = self.correct_direction_from_lidars(
+        #     direction, self.drone.params.lidars, dt
+        # )
+        # direction = self.correct_direction_from_other_drones(
+        #     direction,
+        #     self.drone.params.possition,
+        #     [i.params.possition for i in self.drone.swarm.units],
+        #     dt,
+        # )
         direction = self.correct_gravity(direction, target_speed, dt)
         return direction
 
     def correct_direction_from_lidars(
         self, direction: Vector, lidars: dict, dt: float
     ) -> Vector:
-        if not lidars:
-            return direction
-
-        OBSTACLE_THRESHOLD = 3.0  # Минимальное безопасное расстояние (метры)
-        AVOIDANCE_FORCE = 1.5  # Коэффициент силы избегания
-
-        avoidance_vector = Vector(0, 0, 0)
-
-        for lidar_dir, distance in lidars.items():
-            if distance < OBSTACLE_THRESHOLD:
-                # Нормализованный вектор от препятствия к дрону
-                obstacle_dir = Vector.from_string(lidar_dir).normalize()
-
-                # Сила избегания (обратно пропорциональна расстоянию)
-                force_magnitude = AVOIDANCE_FORCE * (1 - distance / OBSTACLE_THRESHOLD)
-                avoidance_vector += obstacle_dir * force_magnitude
-
-        # Комбинируем исходное направление и вектор избегания
-        combined_dir = direction.replace(y=0) + avoidance_vector
-
-        # Сохраняем горизонтальную составляющую и нормализуем
-        return combined_dir.replace(y=0).normalize()
+        return direction
 
     def correct_height_from_lidars(
         self, direction: Vector, lidars: dict, dt: float
