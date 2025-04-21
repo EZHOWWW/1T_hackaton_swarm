@@ -292,12 +292,12 @@ class DroneExecutor:
         direction = self.correct_direction_from_lidars(
             direction, self.drone.params.lidars, dt
         )
-        # direction = self.correct_direction_from_other_drones(
-        #     direction,
-        #     self.drone.params.possition,
-        #     [i.params.possition for i in self.drone.swarm.units],
-        #     dt,
-        # )
+        direction = self.correct_direction_from_other_drones(
+            direction,
+            self.drone.params.possition,
+            [i.params.possition for i in self.drone.swarm.units],
+            dt,
+        )
         direction = self.correct_gravity(direction, target_speed, dt)
         return direction
 
