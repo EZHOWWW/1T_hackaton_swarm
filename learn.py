@@ -139,7 +139,6 @@ class LearnSimulation:
 
             # 3. The simulation advances. Get the *next* state information
             next_info = self.sim_proxy.get_drones_info()
-            print(next_info)
 
             # 4. Process transitions, calculate rewards, and update agents
             # Iterate through drones to get rewards and done flags for the step that just happened
@@ -463,4 +462,5 @@ async def main():
 if __name__ == "__main__":
     import asyncio
 
+    # asyncio.run(main())
     asyncio.run(main())

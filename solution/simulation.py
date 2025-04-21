@@ -50,8 +50,9 @@ def parse_drone_data(i: dict) -> DroneInfo:
 
 
 class Simulation:
-    def __init__(self):
-        self.connection = SocketConnection()
+    def __init__(self, host="localhost", port=41235):
+        self.connection = SocketConnection(host, port)
+        self.is_connect = False
         self.fireplaces = None
         self.last_drones_info = None
         self.last_engines = None

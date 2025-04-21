@@ -12,7 +12,9 @@ from connection.Connection import Connection
 
 
 class SocketConnection(Connection):
-    def __init__(self):
+    def __init__(self, host: str, port: int):
+        self.host = host
+        self.port = port
         self.__app = FastAPI()
         self.__websocket: Optional[WebSocket] = None
         self.__server = None
@@ -72,13 +74,17 @@ class SocketConnection(Connection):
         answer = await websocket.receive_text()
 
         if answer != CORRECT_ANSWER:
-            logging.info(f"Вебсокет прислал не верный ответ: \"{answer}\"")
+            logging.info(f'Вебсокет прислал не верный ответ: "{answer}"')
             return
 
         self.__websocket = websocket
         logging.info(f"Симулятор подключен: {websocket}")
 
     def __run_server(self):
-        self.__server = uvicorn.Server(uvicorn.Config(self.__app, host=HOST, port=PORT, log_level="critical"))
+        self.__server = uvicorn.Server(
+            uvicorn.Config(
+                self.__app, host=self.host, port=self.port, log_level="critical"
+            )
+        )
         self.__server.run()
         logging.info("Сервер отключен")
