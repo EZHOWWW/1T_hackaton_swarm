@@ -23,6 +23,7 @@ class Swarm:
             start = time.time()
             for u in self.units:
                 u.update(dt)
+                break
             self.upload_drones_info()
             time.sleep(0.1)
 
@@ -38,7 +39,7 @@ class Swarm:
 
     def get_home_pos(self, target: Vector) -> Vector:
         # TODO
-        return Vector()
+        return Vector(-77, 0, 75)
 
     def upload_drones_info(self):
         eng_drones = [v.engines for i, v in enumerate(self.units)]

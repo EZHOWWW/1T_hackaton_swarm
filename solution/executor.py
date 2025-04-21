@@ -195,7 +195,8 @@ class DroneExecutor:
             "setpoint": 0.0,
             "output_limits": (-0.5, 1.0),
         }
-        self.max_tilt_angle = 35.0
+        self.max_tilt_angle = 25.0
+        # TODO best params
         # -----------
 
         self.max_tilt_procent = self.max_tilt_angle / 90
