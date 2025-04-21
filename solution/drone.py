@@ -80,7 +80,10 @@ class Drone:
 
     def go_to_home(self, home_task: GoToHome, dt: float):
         pos = home_task.pos
-        self.engines = self.executor.move_to(pos, 5, 1, dt)
+        target_height = (
+            1 if (self.params.possition - pos).length() < 13 else self.my_height
+        )
+        self.engines = self.executor.move_to(pos, target_height, 1, dt)
 
     def go_to(self, go_to_task: GoToTask, dt: float):
         pos = go_to_task.pos
