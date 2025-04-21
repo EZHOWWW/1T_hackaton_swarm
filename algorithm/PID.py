@@ -128,7 +128,6 @@ def concat_engine(engines, data, drop=False):
         },
         "dropExtinguisher": drop,
     }
-    print(result)
     return result
 
 

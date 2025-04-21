@@ -189,13 +189,13 @@ class Engine:
         self.number = number
         if pid_params is None:
             pid_params = {
-                "Kp": 1,
-                "Ki": 1,
-                "Kd": 1,
+                "Kp": 0.1,
+                "Ki": 0.3,
+                "Kd": 0.7,
                 "setpoint": 0.0,
                 "integral_limits": None,
                 "angle_wrap_degrees": None,
-                "output_limits": (-1, 1),
+                "output_limits": (0, 1),
             }
         self.pid = PIDController(**pid_params)
         self.impact_direction = impact_direction
@@ -251,7 +251,7 @@ class DroneExecutor:
             ("rf", t - 1, -t),  # 7
         ]
         self.engines = [
-            Engine(v[0], i, Vector(v[1], 1, -v[2]).normalize())
+            Engine(v[0], i, Vector(v[1], 1, v[2]).normalize())
             for i, v in enumerate(engines_data)
         ]
 
@@ -293,7 +293,7 @@ class DroneExecutor:
 
         impact_engines = [0] * 8
         up_vector = self.get_up_vector(self.drone.params.angle)
-        print(up_vector)
+        print(up_vector, direction)
         for i, v in enumerate(self.engines):
             impact_engines[i] = (
                 v.impact_to_direction_up(direction, up_vector, 0.5, dt) + 0.5
