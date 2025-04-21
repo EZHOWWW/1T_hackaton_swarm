@@ -248,7 +248,7 @@ class PPOAgent:
 
         # Normalize advantages
         advantages = (advantages - tf.reduce_mean(advantages)) / (
-            tf.math.sqrt(tf.reduce_variance(advantages)) + 1e-8
+            tf.math.sqrt(tf.math.reduce_variance(advantages)) + 1e-8
         )
 
         # --- PPO Update Loop ---
@@ -354,11 +354,11 @@ class PPOAgent:
 
     def save_weights(self, path):
         """Saves model weights."""
-        actor_path = os.path.join(path, "actor_weights.h5")
-        critic_path = os.path.join(path, "critic_weights.h5")
+        actor_path = os.path.join(path, "actor.weights.h5")
+        critic_path = os.path.join(path, "critic.weights.h5")
         self.actor.save_weights(actor_path)
         self.critic.save_weights(critic_path)
-        print(f"Model weights saved to {actor_path} and {critic_path}")
+        # print(f"Model weights saved to {actor_path} and {critic_path}")
 
     def load_weights(self, path):
         """Loads model weights from specified path."""

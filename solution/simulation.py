@@ -90,11 +90,14 @@ class Simulation:
             concat_engine([e * 100 for e in v], {"id": i}, drop[i])
             for i, v in enumerate(engines)
         ]
-        self.connection.send_data(concat_engines(eng, 0.1))
+        self.connection.send_data(concat_engines(eng, 0.01))
         self.can_get_drones_info = True
 
     def reset(self):
-        pass
+        import time
+
+        self.connection.send_data("restartScene")
+        # time.sleep(1)
 
     def close_connection(self):
         print("close")

@@ -61,3 +61,6 @@ class Vector:
 
     def distance_to(self, other) -> float:
         return (other - self).length()
+
+    def distance_xz_to(self, other) -> float:
+        return Vector(other.x - self.x, 0, other.z - self.z).length()
