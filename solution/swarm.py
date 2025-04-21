@@ -1,3 +1,5 @@
+from numpy import clip
+
 from solution.simulation import Simulation
 from solution.drone import Drone
 from solution.geometry import Vector
@@ -38,10 +40,6 @@ class Swarm:
 
     def get_home_pos(self, target: Vector) -> Vector:
         # Определяем вершины параллелепипеда
-        from numpy import clip
-
-        clamp = clip
-
         p1 = Vector(-74, 0, 78)
         p2 = Vector(-74, 1000, 72)
         p3 = Vector(-80, 1000, 72)
@@ -56,9 +54,9 @@ class Swarm:
         max_z = max(p1.z, p2.z, p3.z, p4.z)
 
         # Проецируем точку на параллелепипед
-        closest_x = clamp(target.x, min_x, max_x)
-        closest_y = clamp(target.y, min_y, max_y)
-        closest_z = clamp(target.z, min_z, max_z)
+        closest_x = clip(target.x, min_x, max_x)
+        closest_y = clip(target.y, min_y, max_y)
+        closest_z = clip(target.z, min_z, max_z)
 
         # Проверяем, находится ли проекция внутри "рамки" (боковых граней)
         # Если да, то нужно выбрать ближайшую грань
