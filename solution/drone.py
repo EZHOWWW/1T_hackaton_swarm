@@ -70,6 +70,8 @@ class Drone:
             self.go_to_fireplace(self.task, dt)
         if isinstance(self.task, GoToHome):
             self.go_to_home(self.task, dt)
+            if self.is_at_home():
+                self.task = FindFireplace()
 
     def go_to_fireplace(self, fireplace_task: GoToFireplace, dt: float):
         if (self.params.possition - fireplace_task.pos).replace(
@@ -83,7 +85,7 @@ class Drone:
     def go_to_home(self, home_task: GoToHome, dt: float):
         pos = home_task.pos
         target_height = (
-            1 if (self.params.possition - pos).length() < 13 else self.my_height
+            3 if (self.params.possition - pos).length() < 10 else self.my_height
         )
         self.engines = self.executor.move_to(pos, target_height, 1, dt)
 
@@ -91,7 +93,7 @@ class Drone:
         pos = go_to_task.pos
         self.engines = self.executor.move_to(pos, self.my_height, 1, dt)
 
-    def is_at_home(self) -> Vector:
+    def is_at_home(self) -> bool:
         # Определяем вершины параллелепипеда
         p1 = Vector(-74, 0, 78)
         p2 = Vector(-74, 1000, 72)
@@ -110,7 +112,7 @@ class Drone:
         is_in_x = min_x <= self.params.possition.x <= max_x
         is_in_y = min_y <= self.params.possition.y <= max_y
         is_in_z = min_z <= self.params.possition.z <= max_z
-        
+
         return is_in_x and is_in_y and is_in_z
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
@@ -152,7 +154,7 @@ class Drone:
                 print(
                     f"distance to target: {dist.length()} \t | x : {abs(dist.x)}, \t | y : {abs(dist.y)}"
                 )
-            print(type(self.task), self.task.pos)
+            print(type(self.task))
             print(self.params)
             print(self.engines)
             print("\n\n")

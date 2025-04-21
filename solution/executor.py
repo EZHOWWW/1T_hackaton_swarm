@@ -196,7 +196,7 @@ class DroneExecutor:
             "integral_limits": None,
             "output_limits": (-0.9, +0.9),
         }
-        self.max_tilt_angle = 30
+        self.max_tilt_angle = 16.0
         # TODO best params
         # -----------
 
@@ -363,7 +363,6 @@ class DroneExecutor:
         corrected_direction = direction + avoidance_vector
 
         # corrected_direction = corrected_direction.normalize()
-        print(corrected_direction)
 
         return corrected_direction
 
