@@ -36,9 +36,51 @@ class Swarm:
         # TODO
         pass
 
-    def get_home_pos(self, target: Vector) -> Vector:
-        # TODO
-        return Vector(-77, 0, 75)
+    def get_home_pos(self, target: Vector) -> Vector:def get_home_pos(target: Vector) -> Vector:
+        # Определяем вершины параллелепипеда
+        p1 = Vector(-74, 0, 78)
+        p2 = Vector(-74, 1000, 72)
+        p3 = Vector(-80, 1000, 72)
+        p4 = Vector(-80, 0, 78)
+        
+        # Параметры параллелепипеда
+        min_x = min(p1.x, p2.x, p3.x, p4.x)
+        max_x = max(p1.x, p2.x, p3.x, p4.x)
+        min_y = min(p1.y, p2.y, p3.y, p4.y)
+        max_y = max(p1.y, p2.y, p3.y, p4.y)
+        min_z = min(p1.z, p2.z, p3.z, p4.z)
+        max_z = max(p1.z, p2.z, p3.z, p4.z)
+        
+        # Проецируем точку на параллелепипед
+        closest_x = clamp(target.x, min_x, max_x)
+        closest_y = clamp(target.y, min_y, max_y)
+        closest_z = clamp(target.z, min_z, max_z)
+        
+        # Проверяем, находится ли проекция внутри "рамки" (боковых граней)
+        # Если да, то нужно выбрать ближайшую грань
+        if (min_x < target.x < max_x and 
+            min_z < target.z < max_z):
+            # Точка проекции внутри рамки, выбираем ближайшую грань по Y
+            if abs(target.y - max_y) < abs(target.y - min_y):
+                closest_y = max_y
+            else:
+                closest_y = min_y
+        elif (min_x < target.x < max_x and 
+              min_y < target.y < max_y):
+            # Точка проекции между min_z и max_z, выбираем ближайшую Z грань
+            if abs(target.z - max_z) < abs(target.z - min_z):
+                closest_z = max_z
+            else:
+                closest_z = min_z
+        elif (min_z < target.z < max_z and 
+              min_y < target.y < max_y):
+            # Точка проекции между min_x и max_x, выбираем ближайшую X грань
+            if abs(target.x - max_x) < abs(target.x - min_x):
+                closest_x = max_x
+            else:
+                closest_x = min_x
+        
+        return Vector(closest_x, closest_y, closest_z)
 
     def upload_drones_info(self):
         eng_drones = [v.engines for i, v in enumerate(self.units)]
