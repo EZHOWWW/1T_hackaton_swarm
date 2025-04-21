@@ -38,6 +38,9 @@ class Swarm:
         # TODO
         pass
 
+    def any_drone_alive(self) -> bool:
+        return any([d.params.is_alive for d in self.units])
+    
     def get_home_pos(self, target: Vector) -> Vector:
         # Определяем вершины параллелепипеда
         p1 = Vector(-74, 0, 78)
