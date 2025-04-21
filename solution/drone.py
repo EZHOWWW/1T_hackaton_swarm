@@ -1,3 +1,5 @@
+from numpy import clip
+
 import asyncio
 from solution.simulation import Simulation, Fireplace, DroneInfo
 from abc import ABC
@@ -88,6 +90,28 @@ class Drone:
     def go_to(self, go_to_task: GoToTask, dt: float):
         pos = go_to_task.pos
         self.engines = self.executor.move_to(pos, self.my_height, 1, dt)
+
+    def is_at_home(self) -> Vector:
+        # Определяем вершины параллелепипеда
+        p1 = Vector(-74, 0, 78)
+        p2 = Vector(-74, 1000, 72)
+        p3 = Vector(-80, 1000, 72)
+        p4 = Vector(-80, 0, 78)
+
+        # Параметры параллелепипеда
+        min_x = min(p1.x, p2.x, p3.x, p4.x)
+        max_x = max(p1.x, p2.x, p3.x, p4.x)
+        min_y = min(p1.y, p2.y, p3.y, p4.y)
+        max_y = max(p1.y, p2.y, p3.y, p4.y)
+        min_z = min(p1.z, p2.z, p3.z, p4.z)
+        max_z = max(p1.z, p2.z, p3.z, p4.z)
+
+        # Проверяем, находится ли точка в пределах всех границ
+        is_in_x = min_x <= self.params.possition.x <= max_x
+        is_in_y = min_y <= self.params.possition.y <= max_y
+        is_in_z = min_z <= self.params.possition.z <= max_z
+        
+        return is_in_x and is_in_y and is_in_z
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
         """Ищет ближайший свободный и активный камин и назначает его себе."""
