@@ -195,7 +195,7 @@ class DroneExecutor:
             "setpoint": 0.0,
             "output_limits": (-0.5, 1.0),
         }
-        self.max_tilt_angle = 25.0
+        self.max_tilt_angle = 35.0
         # -----------
 
         self.max_tilt_procent = self.max_tilt_angle / 90
@@ -250,9 +250,12 @@ class DroneExecutor:
         self.altitude_pid.setpoint = target_altitude
         return np.full(8, self.altitude_pid.update(current_altitude, dt))
 
-    def move_to_direction(
-        self, direction: Vector, target_height: float, target_speed: float, dt: float
+    def move_to(
+        self, target: Vector, target_height: float, target_speed: float, dt: float
     ) -> list[float]:
+        direction = self.drone.params.possition - target
+        direction = Vector(x=direction.z, y=0, z=direction.x).normalize()
+
         engines = np.zeros(8)
         direction = self.correct_direction(direction, target_speed, dt)
         print(direction)
@@ -277,15 +280,29 @@ class DroneExecutor:
     def correct_direction(
         self, direction: Vector, target_speed: float, dt: float
     ) -> Vector:
-        return self.correct_gravity(
-            self.correct_direction_from_lidars(direction, self.drone.params.lidars, dt),
-            target_speed,
-            dt,
+        direction = self.correct_direction_from_lidars(
+            direction, self.drone.params.lidars, dt
         )
+        direction = self.correct_gravity(direction, target_speed, dt)
+        direction = self.correct_direction_from_other_drones(direction, dt)
+        return direction
 
     def correct_direction_from_lidars(
         self, direction: Vector, lidars: dict, dt: float
     ) -> Vector:
+        # TODO
+        return direction
+
+    def correct_height_from_lidars(
+        self, direction: Vector, lidars: dict, dt: float
+    ) -> Vector:
+        # TODO
+        return direction
+
+    def correct_direction_from_other_drones(
+        self, direction: Vector, dt: float
+    ) -> Vector:
+        # TODO
         return direction
 
     def correct_gravity(

@@ -63,26 +63,26 @@ class Drone:
                 self.task = GoToFireplace(pos)
             else:
                 self.task = Sleep()
-
         if isinstance(self.task, GoToFireplace):
             self.go_to_fireplace(self.task, dt)
+        if isinstance(self.task, GoToHome):
+            self.go_to_home(self.task, dt)
 
-    def go_to_fireplace(self, fireplace_task: GoToFireplace, dt):
+    def go_to_fireplace(self, fireplace_task: GoToFireplace, dt: float):
         if (self.params.possition - fireplace_task.pos).replace(
             y=0
         ).length() <= DISTANCE_TO_DROP:
             self.need_drop = True
-            # self.task = GoToHome(self.swarm.get_home_pos(self.params.possition))
-            self.task = GoToHome(Vector())
+            self.task = GoToHome(self.swarm.get_home_pos(self.params.possition))
         else:
             self.go_to(fireplace_task, dt)
 
+    def go_to_home(self, home_task: GoToHome, dt: float):
+        # TODO
+        pass
+
     def go_to(self, go_to_task: GoToTask, dt: float):
-        direction = self.params.possition - go_to_task.pos
-        direction = Vector(
-            x=direction.z, y=0, z=direction.x
-        ).normalize()  # какого хера. Что то напутал поэтому так
-        self.engines = self.executor.move_to_direction(direction, 6, 1, dt)
+        self.engines = self.executor.move_to(go_to_task.pos, 6, 1, dt)
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
         """Ищет ближайший свободный и активный камин и назначает его себе."""
