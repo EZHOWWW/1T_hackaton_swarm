@@ -22,7 +22,7 @@ class Swarm:
             dt = time.time() - start
             start = time.time()
             for u in self.units:
-                u.update(dt * 10)
+                u.update(dt)
                 break
             self.upload_drones_info()
             time.sleep(0.1)

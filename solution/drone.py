@@ -46,7 +46,7 @@ class Drone:
         self.engines: list[float] = [0.0] * 8
         self.need_drop: bool = False
 
-        self.my_height = 10
+        self.my_height = self.id * 3 + 5
         self.executor = DroneExecutor(self)
 
     def update(self, dt: float):
@@ -72,14 +72,17 @@ class Drone:
             y=0
         ).length() <= DISTANCE_TO_DROP:
             self.need_drop = True
-            self.task = GoToHome(self.swarm.get_home_pos(self.params.possition))
+            # self.task = GoToHome(self.swarm.get_home_pos(self.params.possition))
+            self.task = GoToHome(Vector())
         else:
             self.go_to(fireplace_task, dt)
 
     def go_to(self, go_to_task: GoToTask, dt: float):
-        direction = go_to_task.pos - self.params.possition
-        self.engines = self.executor.move_to_direction(direction, self.my_height, 1, dt)
-        # self.engines = self.executor.engines_for_speed(dire)
+        direction = self.params.possition - go_to_task.pos
+        direction = Vector(
+            x=direction.z, y=0, z=direction.x
+        ).normalize()  # какого хера. Что то напутал поэтому так
+        self.engines = self.executor.move_to_direction(direction, 6, 1, dt)
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
         """Ищет ближайший свободный и активный камин и назначает его себе."""
@@ -107,8 +110,19 @@ class Drone:
             return None
 
     def log(self):
-        print("=" * 10 + f"DRONE: {self.params.id}" + "=" * 10)
-        print(type(self.task), self.task.pos)
-        print(self.params)
-        print(self.engines)
-        print("\n\n")
+        if self.params.is_alive:
+            print("=" * 10 + f"DRONE: {self.params.id}" + "=" * 10)
+            if (
+                isinstance(self.task, GoToTask)
+                and self.task is not None
+                and self.params.possition is not None
+            ):
+                print(self.params.possition, type(self.task))
+                dist = self.params.possition - self.task.pos
+                print(
+                    f"distance to target: {dist.length()} \t | x : {abs(dist.x)}, \t | y : {abs(dist.y)}"
+                )
+            print(type(self.task), self.task.pos)
+            print(self.params)
+            print(self.engines)
+            print("\n\n")

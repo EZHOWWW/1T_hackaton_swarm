@@ -178,66 +178,181 @@ class PIDController:
 
 
 class DroneExecutor:
-    # pid for each engine
-    # direction + antigrav
-    # наклон изменяет угол
     def __init__(self, drone):
         self.drone = drone
+        # --- Параметры управления ---
         self.altitude_pid = PIDController(
             Kp=0.2,
-            Ki=0.4,
-            Kd=0.9,
-            setpoint=self.drone.my_height,
+            Ki=0.6,
+            Kd=0.2,
+            setpoint=0,
             output_limits=(0, 0.8),
         )
         pitch_yaw_pid_params = {
-            "Kp": 0.01,
-            "Ki": 0.01,
-            "Kd": 0.01,
+            "Kp": 0.3,
+            "Ki": 0.8,
+            "Kd": 0.1,
             "setpoint": 0.0,
-            "output_limits": (0.0, 0.3),
+            "output_limits": (-0.5, 1.0),
         }
+        self.max_tilt_angle = 25.0
+        # -----------
+
+        self.max_tilt_procent = self.max_tilt_angle / 90
         self.pitch_pid = PIDController(**pitch_yaw_pid_params)
         self.yaw_pid = PIDController(**pitch_yaw_pid_params)
 
-        # pitch roll
-        # --- Параметры управления ---
-        self.max_tilt_angle = 20.0
-
-    def get_altitude_correction(self, target_height: float, dt: float) -> list[float]:
-        self.altitude_pid.setpoint = target_height
-        return np.full(
-            8,
-            self.altitude_pid.update(self.drone.params.possition.y, dt),
-            dtype=np.float64,
-        )
-
     def get_pitch_correction(
-        self, direction: Vector, target_speed: float, dt: float
-    ) -> list[float]:
-        cur_angle = self.drone.params.angle[0]
-        val = direction.z / direction.length() * self.max_tilt_angle
-        self.pitch_pid.setpoint = val
-        currection = self.pitch_pid.update(cur_angle, dt)
+        self,
+        target_up: Vector,
+        current_up_vector: Vector,
+        target_speed: float,
+        dt: float,
+    ):
+        forwared_vec = Vector(1, 0, 0).normalize()
+        direction = target_up
+        setpoint = forwared_vec.dot(direction)
+        # setpoint = direction.x
+        self.pitch_pid.setpoint = setpoint
+        measurement = forwared_vec.dot(current_up_vector)
+        # measurement = current_up_vector.x
+        impact = self.pitch_pid.update(measurement, dt)
 
-        return np.array([1, 1, 0, 0, -1, -1, 0, 0]) * currection
+        # print(
+        #     f"pitch correction: setpoint : {setpoint}, meas : {measurement}, impact : {impact} "
+        # )
+
+        return np.array([-1, -1, 0, 0, +1, +1, 0, 0]) * impact
 
     def get_yaw_correction(
-        self, direction: Vector, target_speed: float, dt: float
-    ) -> list[float]:
-        cur_angle = self.drone.params.angle[2]
-        val = -direction.x / direction.length() * self.max_tilt_angle
-        self.yaw_pid.setpoint = val
-        currection = self.yaw_pid.update(cur_angle, dt)
+        self,
+        target_up: Vector,
+        current_up_vector: Vector,
+        target_speed: float,
+        dt: float,
+    ):
+        forwared_vec = Vector(0, 0, +1).normalize()
+        direction = target_up
+        setpoint = forwared_vec.dot(direction)
+        self.yaw_pid.setpoint = setpoint
+        measurement = forwared_vec.dot(current_up_vector)
+        impact = self.yaw_pid.update(measurement, dt)
 
-        return np.array([0, 0, 1, 1, 0, 0, -1, -1]) * currection
-    
+        # print(
+        #     f"yaw correction: setpoint : {setpoint}, meas : {measurement}, impact : {impact} "
+        # )
+
+        return np.array([0, 0, +1, +1, 0, 0, -1, -1]) * impact
+
+    def get_altitude_correction(
+        self, target_altitude: float, current_altitude: float, dt: float
+    ):
+        self.altitude_pid.setpoint = target_altitude
+        return np.full(8, self.altitude_pid.update(current_altitude, dt))
 
     def move_to_direction(
         self, direction: Vector, target_height: float, target_speed: float, dt: float
     ) -> list[float]:
         engines = np.zeros(8)
-
+        direction = self.correct_direction(direction, target_speed, dt)
+        print(direction)
+        vector_up = self.get_up_vector()
+        print(vector_up)
+        engines += self.get_pitch_correction(direction, vector_up, target_speed, dt)
+        engines += self.get_yaw_correction(direction, vector_up, target_speed, dt)
+        engines += self.get_altitude_correction(
+            target_height, self.drone.params.possition.y, dt
+        )
 
         engines = np.clip(engines, 0, 1)
         return engines
+
+    def apply_negativ_to_opposite(self, impact_engines: list[float]) -> list[float]:
+        for i, v in enumerate(impact_engines):
+            if v < 0:
+                impact_engines[(i + 4) % 8] -= v
+                impact_engines[i] = 0
+        return impact_engines
+
+    def correct_direction(
+        self, direction: Vector, target_speed: float, dt: float
+    ) -> Vector:
+        return self.correct_gravity(
+            self.correct_direction_from_lidars(direction, self.drone.params.lidars, dt),
+            target_speed,
+            dt,
+        )
+
+    def correct_direction_from_lidars(
+        self, direction: Vector, lidars: dict, dt: float
+    ) -> Vector:
+        return direction
+
+    def correct_gravity(
+        self, direction: Vector, target_speed: float, dt: float
+    ) -> Vector:
+        """
+        Params
+        ---------
+        direction : Vector len = 1, y=0
+        """
+        direction = direction.replace(y=0)
+        return direction.replace(
+            y=direction.length() / self.max_tilt_procent
+        ).normalize()
+
+    def correct_height(
+        target_height: float, direction: Vector, lidars: dict, df: float
+    ) -> float:
+        return target_height
+
+    def get_up_vector(self, rotate: list[float] | None = None) -> Vector:
+        """
+        Вычисляет единичный вектор, направленный вверх, на основе углов Эйлера дрона.
+
+        Args:
+            rotate: Список из трех углов (тангаж, рысканье, крен) в градусах.
+                    Порядок: [тангаж (pitch), рысканье (yaw), крен (roll)].
+
+        Returns:
+            Единичный вектор (numpy array) [x, y, z], представляющий направление "вверх".
+        """
+        if rotate is None:
+            rotate = self.drone.params.angle
+        pitch_rad = np.deg2rad(rotate[2])
+        yaw_rad = np.deg2rad(rotate[1])
+        roll_rad = np.deg2rad(rotate[0])
+
+        # Матрицы вращения вокруг осей X, Y и Z
+        Rx = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(pitch_rad), -np.sin(pitch_rad)],
+                [0, np.sin(pitch_rad), np.cos(pitch_rad)],
+            ]
+        )
+
+        Ry = np.array(
+            [
+                [np.cos(yaw_rad), 0, np.sin(yaw_rad)],
+                [0, 1, 0],
+                [-np.sin(yaw_rad), 0, np.cos(yaw_rad)],
+            ]
+        )
+
+        Rz = np.array(
+            [
+                [np.cos(roll_rad), -np.sin(roll_rad), 0],
+                [np.sin(roll_rad), np.cos(roll_rad), 0],
+                [0, 0, 1],
+            ]
+        )
+        # Матрица вращения, представляющая ориентацию дрона (в мировых координатах)
+        # Порядок умножения матриц важен: сначала крен, затем тангаж, затем рысканье (ZYX)
+        R = Ry @ Rx @ Rz
+
+        up_local = np.array([0, 1, 0])
+
+        up_global = R @ up_local
+
+        return Vector(*up_global)
