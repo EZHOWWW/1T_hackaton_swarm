@@ -46,7 +46,8 @@ class Drone:
         self.engines: list[float] = [0.0] * 8
         self.need_drop: bool = False
 
-        self.my_height = self.id * 3 + 14
+        # self.my_height = self.id * 3 + 14
+        self.my_height = 8
         self.executor = DroneExecutor(self)
 
     def update(self, dt: float):
@@ -82,7 +83,9 @@ class Drone:
         pass
 
     def go_to(self, go_to_task: GoToTask, dt: float):
-        self.engines = self.executor.move_to(go_to_task.pos, self.my_height, 1, dt)
+        # pos = go_to_task.pos
+        pos = Vector(-77, 0.5, 68)
+        self.engines = self.executor.move_to(pos, self.my_height, 1, dt)
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
         """Ищет ближайший свободный и активный камин и назначает его себе."""

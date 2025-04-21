@@ -189,19 +189,27 @@ class DroneExecutor:
             output_limits=(0, 0.8),
         )
         pitch_yaw_pid_params = {
-            "Kp": 0.3,
-            "Ki": 0.8,
+            "Kp": 0.4,
+            "Ki": 1.0,
             "Kd": 0.1,
             "setpoint": 0.0,
+            "integral_limits": None,
             "output_limits": (-0.5, 1.0),
         }
-        self.max_tilt_angle = 25.0
+        self.max_tilt_angle = 10.0
         # TODO best params
         # -----------
 
         self.max_tilt_procent = self.max_tilt_angle / 90
         self.pitch_pid = PIDController(**pitch_yaw_pid_params)
         self.yaw_pid = PIDController(**pitch_yaw_pid_params)
+
+        self._safety_radius = (
+            4.0  # Радиус безопасности use in self.correct_direction_from_other_drones
+        )
+        self._repulsion_strength = (
+            20.0  # Сила отталкивания use in self.correct_direction_from_other_drones
+        )
 
     def get_pitch_correction(
         self,
@@ -259,9 +267,9 @@ class DroneExecutor:
 
         engines = np.zeros(8)
         direction = self.correct_direction(direction, target_speed, dt)
-        print(direction)
+        # print(direction)
         vector_up = self.get_up_vector()
-        print(vector_up)
+        # print(vector_up)
         engines += self.get_pitch_correction(direction, vector_up, target_speed, dt)
         engines += self.get_yaw_correction(direction, vector_up, target_speed, dt)
         engines += self.get_altitude_correction(
@@ -284,8 +292,13 @@ class DroneExecutor:
         direction = self.correct_direction_from_lidars(
             direction, self.drone.params.lidars, dt
         )
+        direction = self.correct_direction_from_other_drones(
+            direction,
+            self.drone.params.possition,
+            [i.params.possition for i in self.drone.swarm.units],
+            dt,
+        )
         direction = self.correct_gravity(direction, target_speed, dt)
-        direction = self.correct_direction_from_other_drones(direction, dt)
         return direction
 
     def correct_direction_from_lidars(
@@ -301,10 +314,58 @@ class DroneExecutor:
         return direction
 
     def correct_direction_from_other_drones(
-        self, direction: Vector, dt: float
+        self,
+        direction: Vector,
+        my_possition: Vector,  # Позиция текущего дрона (можно использовать self.position)
+        drones_possitions: list[Vector],
+        dt: float,
+        drones_speed: list[Vector] | None = None,
     ) -> Vector:
-        # TODO
-        return direction
+        """
+        Корректирует направление для избегания столкновений с другими дронами (APF).
+        """
+        avoidance_vector = (
+            Vector()
+        )  # Используем конструктор по умолчанию для нулевого вектора
+        EPSILON = 1e-9  # Малый допуск для сравнения float и избегания деления на 0
+
+        for other_pos in drones_possitions:
+            # Проверка, является ли other_pos позицией текущего дрона
+            # Сравниваем координаты напрямую из-за отсутствия __eq__ и для надежности
+            is_self = (
+                abs(other_pos.x - my_possition.x) < EPSILON
+                and abs(other_pos.y - my_possition.y) < EPSILON
+                and abs(other_pos.z - my_possition.z) < EPSILON
+            )
+            if is_self:
+                continue
+
+            relative_pos = my_possition - other_pos
+            distance = relative_pos.length()
+
+            if distance < self._safety_radius and distance > EPSILON:
+                # Сила отталкивания (увеличивается при приближении)
+                repulsion_magnitude = self._repulsion_strength * (
+                    self._safety_radius / distance - 1.0
+                )
+                # Направление отталкивания
+                repulsion_direction = (
+                    relative_pos.normalize()
+                )  # Ваш normalize() обрабатывает нулевую длину
+                avoidance_vector += repulsion_direction * repulsion_magnitude
+            elif distance <= EPSILON:
+                # Дроны слишком близко или в одной точке - небольшой "толчок"
+                # Можно сделать его случайным или зависящим от индекса дрона, чтобы избежать симметрии
+                avoidance_vector += (
+                    Vector(0.1, -0.1, 0) * self._repulsion_strength * 0.1
+                )  # Пример масштабированного толчка
+
+        corrected_direction = direction + avoidance_vector
+
+        # corrected_direction = corrected_direction.normalize()
+        print(corrected_direction)
+
+        return corrected_direction
 
     def correct_gravity(
         self, direction: Vector, target_speed: float, dt: float
