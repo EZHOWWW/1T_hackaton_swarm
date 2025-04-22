@@ -7,18 +7,19 @@ async def start_websocket():
     from solution.simulation import Simulation
     from solution.swarm import Swarm
 
-    while True:
-        sim = Simulation()
-        await sim.connect_to_server()
+    sim = Simulation()
+    await sim.connect_to_server()
     
+    while True:
         # here is solution
         swarm = Swarm(sim)
         swarm.start()
-    
-        sim.close_connection()
-
         if input("To exit print 'q'") == "q":
             break
+        else:
+            sim.connection.send_data("restartScene")
+
+    sim.close_connection()
 
 
 if __name__ == "__main__":
