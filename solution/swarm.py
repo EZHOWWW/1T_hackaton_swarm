@@ -20,7 +20,8 @@ class Swarm:
         dt = 1
         start = time.time()
         while True:
-            self.update_drones_info()
+            if not self.update_drones_info():
+                continue
             if not self.any_drone_alive():
                 break
             dt = time.time() - start
@@ -32,9 +33,11 @@ class Swarm:
 
     def update_drones_info(self):
         info = self.sim.get_drones_info()
+        if not info: return False
         for i, v in enumerate(self.units):
             v.params = info[i]
             v.engines = self.sim.last_engines[i]
+        return True
 
     def calculate_home_squere(self):
         # TODO
