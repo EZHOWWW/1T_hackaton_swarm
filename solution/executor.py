@@ -205,7 +205,7 @@ class DroneExecutor:
         self.yaw_pid = PIDController(**pitch_yaw_pid_params)
 
         self._safety_radius = (
-            3.0  # Радиус безопасности use in self.correct_direction_from_other_drones
+            3.0  # Радиус безопасности use in self.correct_direction_from_other_drones, correct_direction_from_lidars
         )
         self._repulsion_strength = (
             10.0  # Сила отталкивания use in self.correct_direction_from_other_drones
@@ -305,7 +305,49 @@ class DroneExecutor:
     def correct_direction_from_lidars(
         self, direction: Vector, lidars: dict, dt: float
     ) -> Vector:
-        return direction
+        # Нормализуем исходный вектор направления
+        desired_dir = direction.normalize()
+        
+        # Инициализируем вектор коррекции
+        correction = Vector()
+        
+        # Направления лидаров в локальной системе координат дрона
+        lidar_directions = {
+            'f': Vector(1, 0, 0),    # вперед
+            'fr': Vector(1, 0, -1),  # вперед-вправо
+            'r': Vector(0, 0, -1),   # вправо
+            'br': Vector(-1, 0, -1), # назад-вправо
+            'b': Vector(-1, 0, 0),   # назад
+            'bl': Vector(-1, 0, 1),  # назад-влево
+            'l': Vector(0, 0, 1),    # влево
+            'fl': Vector(1, 0, 1),   # вперед-влево
+            'up': Vector(0, 1, 0),   # вверх
+            'd': Vector(0, -1, 0)    # вниз
+        }
+        
+        # Нормализуем направления лидаров
+        for key in lidar_directions:
+            lidar_directions[key] = lidar_directions[key].normalize()
+        
+        # Обрабатываем показания каждого лидара
+        for lidar_name, distance in lidars.items():
+            if distance == -1:
+                continue  # нет препятствия или слишком далеко
+            
+            # Рассчитываем силу отталкивания (чем ближе - тем сильнее)
+            force = max(0, self._repulsion_strength * (1 - distance / self._safety_radius))
+            
+            # Получаем направление на препятствие
+            obstacle_dir = lidar_directions[lidar_name]
+            
+            # Добавляем вектор коррекции (в противоположную сторону)
+            correction = correction + (obstacle_dir * -force)
+        
+        # Добавляем коррекцию к желаемому направлению
+        result_dir = desired_dir + correction
+        
+        # Нормализуем итоговый вектор
+        return result_dir.normalize()
 
     def correct_height_from_lidars(
         self, direction: Vector, lidars: dict, dt: float
