@@ -6,12 +6,24 @@ from solution.geometry import Vector
 import time
 
 
+def get_point() -> dict[Vector, list[Vector]]:
+    p = {
+        Vector(-72.35, 6.5, 92.83): [
+            Vector(-72.40, 6.5, 83.03),
+            Vector(-72.35, 6.5, 92.83),
+        ]
+    }
+    return p
+
+
 class Swarm:
     def __init__(self, sim: Simulation, unit_count: int = 5):
         self.sim = sim
         self.unit_count = unit_count
         self.units = [Drone(i, self.sim, self) for i in range(self.unit_count)]
         self.fireplaces = None
+
+        self.points = get_point()
 
     def start(self):
         self.fireplaces = [[i, -1] for i in self.sim.get_fireplaces_info()]
@@ -33,7 +45,8 @@ class Swarm:
 
     def update_drones_info(self):
         info = self.sim.get_drones_info()
-        if not info: return False
+        if not info:
+            return False
         for i, v in enumerate(self.units):
             v.params = info[i]
             v.engines = self.sim.last_engines[i]
@@ -45,7 +58,7 @@ class Swarm:
 
     def any_drone_alive(self) -> bool:
         return any([d.params.is_alive for d in self.units])
-    
+
     def get_home_pos(self, target: Vector) -> Vector:
         # Определяем вершины параллелепипеда
         p1 = Vector(-74, 0, 78)
@@ -94,3 +107,9 @@ class Swarm:
         drop_drones = [v.need_drop for i, v in enumerate(self.units)]
 
         self.sim.set_drones(eng_drones, drop_drones)
+
+    def get_fireplace_points(
+        self, fireplace_pos: Vector
+    ) -> tuple[Vector, list[Vector]]:
+        closest_key = min(self.points, key=lambda key: (key - fireplace_pos).length())
+        return closest_key, self.points[closest_key]

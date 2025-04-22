@@ -19,6 +19,21 @@ class Sleep(Task):
     pass
 
 
+class GoOnPoints(Task):
+    def __init__(self, points: list[Vector]):
+        self.points = points
+
+
+class GoToFireplaceOnPoints(Task):
+    def __init__(self, points: list[Vector]):
+        super().__init__(points)
+
+
+class GoToHomeOnPoints(Task):
+    def __init__(self, points: list[Vector]):
+        super().__init__(points)
+
+
 class GoToTask(Task):
     def __init__(self, pos: Vector):
         self.pos = pos
@@ -61,9 +76,11 @@ class Drone:
 
     def solve_task(self, task: Task, dt: float):
         if isinstance(self.task, FindFireplace):
-            pos = self.find_fireplace(self.swarm.fireplaces)
-            if pos is not None:
-                self.task = GoToFireplace(pos)
+            points = self.find_fireplace_point(self.swarm.fireplaces)
+
+            if points is not None:
+                self.task = GoToFireplaceOnPoints(points)
+                print(points, self.task)
             else:
                 self.task = Sleep()
         if isinstance(self.task, GoToFireplace):
@@ -117,7 +134,6 @@ class Drone:
 
     def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
         """Ищет ближайший свободный и активный камин и назначает его себе."""
-        # return Vector(-77, 10, 68)
         best_fp_index = -1
         min_dist = float("inf")
 
@@ -141,6 +157,14 @@ class Drone:
             # Свободных активных каминов нет
             return None
 
+    def find_fireplace_point(
+        self, fireplaces: list[list[Fireplace, int]]
+    ) -> tuple[Vector, list[Vector]] | None:
+        pos = self.find_fireplace(fireplaces)
+        if pos is not None:
+            return self.swarm.get_fireplace_points(pos)
+        return None
+
     def log(self):
         if self.params.is_alive:
             print("=" * 10 + f"DRONE: {self.params.id}" + "=" * 10)
@@ -154,7 +178,8 @@ class Drone:
                 print(
                     f"distance to target: {dist.length()} \t | x : {abs(dist.x)}, \t | y : {abs(dist.y)}"
                 )
-            print(type(self.task))
+            if isinstance(self.task, GoOnPoints):
+                print(f"GoOnpoints task: {self.task.points}")
             print(self.params)
             print(self.engines)
             print("\n\n")
