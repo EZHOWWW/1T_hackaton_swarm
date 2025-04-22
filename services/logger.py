@@ -18,5 +18,5 @@ def set_logger_config(log_level="INFO"):
         level=level,
         format="%(asctime)s %(levelname)s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
-        filename=LOG_DIR + filename
-    )
+        handlers=[logging.StreamHandler(), logging.FileHandler(LOG_DIR + filename, mode='a', encoding='utf-8'), logging.FileHandler(LOG_DIR + "last.log", mode='w', encoding='utf-8')]
+)
