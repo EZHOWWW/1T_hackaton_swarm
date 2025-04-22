@@ -93,4 +93,5 @@ class Simulation:
         self.can_get_drones_info = True
 
     def close_connection(self):
-        print("close")
+        print("close")  # ахха, хорош, мегахорош))
+        self.connection.close_connection()
