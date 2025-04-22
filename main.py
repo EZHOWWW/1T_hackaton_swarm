@@ -18,6 +18,7 @@ async def start_websocket():
             break
         else:
             sim.connection.send_data("restartScene")
+            print(sim.connection.receive_data())
 
     sim.close_connection()
 
