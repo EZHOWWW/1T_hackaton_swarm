@@ -25,8 +25,9 @@ class GoToTask(Task):
 
 
 class GoToFireplace(GoToTask):
-    def __init__(self, fireplace_pos: Vector):
+    def __init__(self, fireplace_pos: Vector, fireplace_index: int):
         super().__init__(fireplace_pos)
+        self.fireplace_index = fireplace_index
 
 
 class GoToHome(GoToTask):
@@ -34,7 +35,7 @@ class GoToHome(GoToTask):
         super().__init__(home_pos)
 
 
-DISTANCE_TO_DROP = 1.7
+DISTANCE_TO_DROP = 1.2
 
 
 class Drone:
@@ -48,22 +49,31 @@ class Drone:
         self.engines: list[float] = [0.0] * 8
         self.need_drop: bool = False
 
-        # self.my_height = self.id * 3 + 14
-        self.my_height = 12
+        self.have_bomb: bool = True
+        self.is_dead = False
+
+        self.my_height = 8 + self.id * 2
         self.executor = DroneExecutor(self)
 
     def update(self, dt: float):
         """now self.params and self.engines is actual"""
+        if self.is_dead:
+            return
         if self.need_drop:
+            self.have_bomb = False
             self.need_drop = False
         self.solve_task(self.task, dt)
+
+        if not self.params.is_alive:
+            self.dead()
+
         self.log()
 
     def solve_task(self, task: Task, dt: float):
         if isinstance(self.task, FindFireplace):
-            pos = self.find_fireplace(self.swarm.fireplaces)
+            pos, idx = self.find_fireplace(self.swarm.fireplaces)
             if pos is not None:
-                self.task = GoToFireplace(pos)
+                self.task = GoToFireplace(pos, idx)
             else:
                 self.task = Sleep()
         if isinstance(self.task, GoToFireplace):
@@ -84,10 +94,7 @@ class Drone:
 
     def go_to_home(self, home_task: GoToHome, dt: float):
         pos = home_task.pos
-        target_height = (
-            3 if (self.params.possition - pos).length() < 10 else self.my_height
-        )
-        self.engines = self.executor.move_to(pos, target_height, 1, dt)
+        self.engines = self.executor.move_to(pos, self.my_height, 1, dt)
 
     def go_to(self, go_to_task: GoToTask, dt: float):
         pos = go_to_task.pos
@@ -115,9 +122,12 @@ class Drone:
 
         return is_in_x and is_in_y and is_in_z
 
-    def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
+    def find_fireplace(
+        self, fireplaces: list[list[Fireplace, int]]
+    ) -> tuple[Vector, int] | None:
         """Ищет ближайший свободный и активный камин и назначает его себе."""
-        # return Vector(-77, 10, 68)
+        if self.is_dead:
+            return None, None
         best_fp_index = -1
         min_dist = float("inf")
 
@@ -136,10 +146,18 @@ class Drone:
             print(
                 f"Drone: {self.params.id} (Pos: {self.params.possition}) assigned to fireplace index: {best_fp_index} at pos: {chosen_pos}, distance: {min_dist:.2f}"
             )
-            return chosen_pos
+            return chosen_pos, best_fp_index
         else:
             # Свободных активных каминов нет
-            return None
+            return None, None
+
+    def dead(self):
+        self.is_dead = True
+        if isinstance(self.task, GoToFireplace):
+            self.swarm.fireplaces[self.task.fireplace_index][1] = -1
+            print(self.swarm.fireplaces)
+            print("\n\n\n\n\n")
+        print(f"DRONE {self.id} IS DEAD!")
 
     def log(self):
         if self.params.is_alive:

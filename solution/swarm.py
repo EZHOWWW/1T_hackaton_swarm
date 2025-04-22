@@ -18,6 +18,11 @@ class Swarm:
         print(self.fireplaces)
 
         dt = 1
+        self.active_drones([0, 1, 2, 3, 4])
+        active_drones = 1
+        begin_time = time.time()
+        drone_activate_interval = 3
+
         start = time.time()
         while True:
             if not self.update_drones_info():
@@ -26,14 +31,21 @@ class Swarm:
                 break
             dt = time.time() - start
             start = time.time()
-            for u in self.units:
+            for u in self.units[:active_drones]:
                 u.update(dt)
+                break
+            if (
+                time.time() - begin_time > active_drones * drone_activate_interval
+                and active_drones != 6
+            ):
+                active_drones += 1
             self.upload_drones_info()
-            time.sleep(0.1)
+            time.sleep(0.2)
 
     def update_drones_info(self):
         info = self.sim.get_drones_info()
-        if not info: return False
+        if not info:
+            return False
         for i, v in enumerate(self.units):
             v.params = info[i]
             v.engines = self.sim.last_engines[i]
@@ -43,9 +55,14 @@ class Swarm:
         # TODO
         pass
 
+    def active_drones(self, drones_list_id: list[int]):
+        for i in range(5):
+            if i not in drones_list_id:
+                self.units[i].dead()
+
     def any_drone_alive(self) -> bool:
         return any([d.params.is_alive for d in self.units])
-    
+
     def get_home_pos(self, target: Vector) -> Vector:
         # Определяем вершины параллелепипеда
         p1 = Vector(-74, 0, 78)
@@ -87,7 +104,7 @@ class Swarm:
             else:
                 closest_x = min_x
 
-        return Vector(closest_x, closest_y, closest_z)
+        return Vector(closest_x, -1, closest_z)
 
     def upload_drones_info(self):
         eng_drones = [v.engines for i, v in enumerate(self.units)]

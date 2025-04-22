@@ -177,26 +177,92 @@ class PIDController:
         return output
 
 
+class Lidar:
+    def __init__(
+        self,
+        direction_name: str,
+        direction_vector: Vector,
+        force: float,
+        active_distance: float,
+    ):
+        self.direction_name = direction_name
+        self.direction_vector = (
+            direction_vector.normalize()
+        )  # Локальное направление лидара
+        self.force = force
+        self.active_distance = active_distance
+        self.MAX_LIDAR_DISTANCE = 10  # Физический предел дальности
+
+    def get_correction(
+        self,
+        actual_distance: float,
+        rotate: list[float],
+        rotation_func,  # Функция DroneExecutor._rotate_local_to_global
+    ) -> Vector:
+        """Рассчитывает вектор коррекции в ГЛОБАЛЬНОЙ системе координат."""
+        if actual_distance < 0 or actual_distance > self.active_distance:
+            return Vector()  # Нет коррекции
+
+        # Множитель силы (0 до 1), 1 при actual_distance = 0
+        distance_mult = max(0.0, 1.0 - (actual_distance / self.active_distance))
+
+        # Локальный вектор силы (против направления лидара)
+        local_force_vector = (-self.direction_vector) * distance_mult * self.force
+
+        # Преобразование в глобальный вектор коррекции
+        global_correction_vector = rotation_func(local_force_vector, rotate)
+        return global_correction_vector
+
+
 class DroneExecutor:
     def __init__(self, drone):
         self.drone = drone
         # --- Параметры управления ---
+        # - Pid регуляторы -
         self.altitude_pid = PIDController(
-            Kp=0.2,
+            Kp=0.1,
             Ki=0.6,
             Kd=0.2,
             setpoint=0,
-            output_limits=(0, 0.8),
+            output_limits=(0, 0.7),
         )
         pitch_yaw_pid_params = {
-            "Kp": 1,
-            "Ki": 1.3,
-            "Kd": 0.7,
+            "Kp": 1.0,
+            "Ki": 1.1,
+            "Kd": 0.5,
             "setpoint": 0.0,
             "integral_limits": None,
-            "output_limits": (-0.9, +0.9),
+            "output_limits": (-0.8, +0.8),
         }
-        self.max_tilt_angle = 16.0
+        # - Максимальный угол наклона дрона (скорость) -
+        self.max_tilt_angle = 12
+
+        # - Параметры отталкивания дроннов (избежание сталкновений) -
+        self._safety_radius = 3  # Радиус безопасности use in self.correct_direction_from_other_drones, correct_direction_from_lidars
+        self._repulsion_strength = (
+            2  # Сила отталкивания use in self.correct_direction_from_other_drones
+        )
+
+        # - Параметры лидаров -
+        up_lidar_force = u = 0.2
+        self.lidar_directions = {
+            "f": -Vector(-1, u, 0),  # вперед
+            "fr": -Vector(-1, u, -1),  # вперед-вправо
+            "r": -Vector(0, u, -1),  # вправо
+            "br": -Vector(1, u, -1),  # назад-вправо
+            "b": -Vector(1, u, 0),  # назад
+            "bl": -Vector(1, u, +1),  # назад-влево
+            "l": -Vector(0, u, +1),  # влево
+            "fl": -Vector(-1, u, +1),  # вперед-влево
+            "up": Vector(0, 1, 0),  # вверх
+            "d": Vector(0, -1, 0),  # вниз
+        }
+        self.lidar_force = 1
+        self.lidar_active_distance = 8  # дистанция с которой лидар начинает оказывать воздейстиве <= MAX_LIDAR_DISTANCE = 10
+        self.MIN_FLIGHT_HEIGHT = 0.5  # Пример
+        self.MAX_FLIGHT_HEIGHT = 25.0  # Пример
+        self.MAX_TOTAL_LIDAR_CORRECTION_NORM = self.lidar_force * 2
+
         # TODO best params
         # -----------
 
@@ -204,12 +270,10 @@ class DroneExecutor:
         self.pitch_pid = PIDController(**pitch_yaw_pid_params)
         self.yaw_pid = PIDController(**pitch_yaw_pid_params)
 
-        self._safety_radius = (
-            3.0  # Радиус безопасности use in self.correct_direction_from_other_drones, correct_direction_from_lidars
-        )
-        self._repulsion_strength = (
-            10.0  # Сила отталкивания use in self.correct_direction_from_other_drones
-        )
+        self._lidars = [
+            Lidar(l[0], l[1], self.lidar_force, self.lidar_active_distance)
+            for l in self.lidar_directions.items()
+        ]
 
     def get_pitch_correction(
         self,
@@ -263,8 +327,13 @@ class DroneExecutor:
         self, target: Vector, target_height: float, target_speed: float, dt: float
     ) -> list[float]:
         direction = self.drone.params.possition - target
-        print(direction)
         direction = Vector(x=direction.z, y=0, z=direction.x).normalize()
+
+        print(target_height, end="\t")
+        target_height = self.correct_height(
+            target_height, target, self.drone.params.lidars, dt
+        )
+        print(target_height)
 
         engines = np.zeros(8)
         direction = self.correct_direction(direction, target_speed, dt)
@@ -296,64 +365,54 @@ class DroneExecutor:
         direction = self.correct_direction_from_other_drones(
             direction,
             self.drone.params.possition,
-            [i.params.possition for i in self.drone.swarm.units],
+            [i.params.possition for i in self.drone.swarm.units if not i.is_dead],
             dt,
         )
         direction = self.correct_gravity(direction, target_speed, dt)
         return direction
 
     def correct_direction_from_lidars(
-        self, direction: Vector, lidars: dict, dt: float
+        self, direction: Vector, lidars_data: dict, dt: float
     ) -> Vector:
-        # Нормализуем исходный вектор направления
-        desired_dir = direction.normalize()
-        
-        # Инициализируем вектор коррекции
-        correction = Vector()
-        
-        # Направления лидаров в локальной системе координат дрона
-        lidar_directions = {
-            'f': Vector(1, 0, 0),    # вперед
-            'fr': Vector(1, 0, -1),  # вперед-вправо
-            'r': Vector(0, 0, -1),   # вправо
-            'br': Vector(-1, 0, -1), # назад-вправо
-            'b': Vector(-1, 0, 0),   # назад
-            'bl': Vector(-1, 0, 1),  # назад-влево
-            'l': Vector(0, 0, 1),    # влево
-            'fl': Vector(1, 0, 1),   # вперед-влево
-            'up': Vector(0, 1, 0),   # вверх
-            'd': Vector(0, -1, 0)    # вниз
-        }
-        
-        # Нормализуем направления лидаров
-        for key in lidar_directions:
-            lidar_directions[key] = lidar_directions[key].normalize()
-        
-        # Обрабатываем показания каждого лидара
-        for lidar_name, distance in lidars.items():
-            if distance == -1:
-                continue  # нет препятствия или слишком далеко
-            
-            # Рассчитываем силу отталкивания (чем ближе - тем сильнее)
-            force = max(0, self._repulsion_strength * (1 - distance / self._safety_radius))
-            
-            # Получаем направление на препятствие
-            obstacle_dir = lidar_directions[lidar_name]
-            
-            # Добавляем вектор коррекции (в противоположную сторону)
-            correction = correction + (obstacle_dir * -force)
-        
-        # Добавляем коррекцию к желаемому направлению
-        result_dir = desired_dir + correction
-        
-        # Нормализуем итоговый вектор
-        return result_dir.normalize()
+        """
+        Корректирует желаемое направление движения на основе показаний лидаров.
 
-    def correct_height_from_lidars(
-        self, direction: Vector, lidars: dict, dt: float
-    ) -> Vector:
-        # TODO
-        return direction
+        Args:
+            direction: Исходный желаемый вектор направления (ожидается нормализованный).
+            lidars_data: Словарь с данными лидаров {имя: дистанция}.
+            dt: Дельта времени (пока не используется).
+
+        Returns:
+            Новый вектор направления (не обязательно нормализованный),
+            учитывающий силы отталкивания от препятствий.
+            Может вернуть нулевой вектор при сильном конфликте направлений.
+        """
+        total_correction_vector = Vector(0, 0, 0)
+        current_rotation = self.drone.params.angle  # Углы [roll, yaw, pitch]
+
+        for lidar_sensor in self._lidars:
+            direction_name = lidar_sensor.direction_name
+            if (
+                direction_name in lidars_data and lidars_data[direction_name] != -1
+                # and direction_name not in ["up", "d"]
+            ):
+                actual_distance = lidars_data[direction_name]
+                global_correction_vector = lidar_sensor.get_correction(
+                    actual_distance, current_rotation, self._rotate_local_to_global
+                )
+                total_correction_vector += global_correction_vector
+
+        # Ограничение на общую силу коррекции (чтобы избежать слишком резких маневров)
+        correction_norm = total_correction_vector.length()
+        if correction_norm > self.MAX_TOTAL_LIDAR_CORRECTION_NORM:
+            total_correction_vector = total_correction_vector * (
+                self.MAX_TOTAL_LIDAR_CORRECTION_NORM / correction_norm
+            )
+            print(f"Lidar correction capped at {self.MAX_TOTAL_LIDAR_CORRECTION_NORM}")
+
+        corrected_direction = direction + total_correction_vector
+
+        return corrected_direction
 
     def correct_direction_from_other_drones(
         self,
@@ -404,7 +463,7 @@ class DroneExecutor:
 
         corrected_direction = direction + avoidance_vector
 
-        # corrected_direction = corrected_direction.normalize()
+        corrected_direction = corrected_direction.normalize()
 
         return corrected_direction
 
@@ -422,60 +481,73 @@ class DroneExecutor:
         ).normalize()
 
     def correct_height(
-        target_height: float, direction: Vector, lidars: dict, df: float
+        self,
+        target_height: float,
+        target_pos: Vector,
+        lidars: dict,  # Данные лидаров {имя: дистанция}
+        dt: float,
     ) -> float:
-        return target_height
+        """Объединяет коррекции высоты."""
+        # 1. Коррекция по дистанции до цели (из вашего кода)
+        pos_diff = self.drone.params.possition - target_pos
+        distance_xz = Vector(pos_diff.x, 0, pos_diff.z).length()
+
+        target_height = self.correct_height_to_distance(
+            target_height, distance_xz, target_pos.y
+        )
+
+        # 2. Коррекция по лидарам
+        target_height = self.correct_height_from_lidars(target_height, lidars, dt)
+
+        # 3. Ограничение высоты полета
+        final_height = max(
+            self.MIN_FLIGHT_HEIGHT,
+            min(self.MAX_FLIGHT_HEIGHT, target_height),
+        )
+
+        return final_height
+
+    def correct_height_to_distance(
+        self, height: float, distance_xz: float, target_pos_y: float
+    ) -> float:
+        """Коррекция высоты при приближении к цели по горизонтали."""
+        DISTANCE_TO_GO_DOWN = 4
+        UP_TO_TARGET = 5
+        if distance_xz < DISTANCE_TO_GO_DOWN:
+            # Приближаемся к высоте цели
+            return target_pos_y + UP_TO_TARGET
+        return height
+
+    def correct_height_from_lidars(
+        self, current_target_height: float, lidars_data: dict, dt: float
+    ) -> float:
+        """Корректирует целевую высоту на основе лидаров и ориентации дрона."""
+        total_vertical_correction = 0.0
+        current_rotation = self.drone.params.angle  # Углы [roll, yaw, pitch]
+
+        for lidar_sensor in self._lidars:
+            direction_name = lidar_sensor.direction_name
+            if direction_name in lidars_data and lidars_data[direction_name] != -1:
+                actual_distance = lidars_data[direction_name]
+                # Получаем глобальный вектор коррекции от лидара
+                global_correction_vector = lidar_sensor.get_correction(
+                    actual_distance,
+                    current_rotation,
+                    self._rotate_local_to_global,  # Передаем метод вращения
+                )
+                # Суммируем только вертикальную (Y) компоненту
+                total_vertical_correction += global_correction_vector.y
+            # else: Игнорируем отсутствующие данные лидара
+
+        # Применяем суммарную коррекцию
+        corrected_height = current_target_height + total_vertical_correction
+        return corrected_height
 
     def get_up_vector(self, rotate: list[float] | None = None) -> Vector:
-        """
-        Вычисляет единичный вектор, направленный вверх, на основе углов Эйлера дрона.
-
-        Args:
-            rotate: Список из трех углов (тангаж, рысканье, крен) в градусах.
-                    Порядок: [тангаж (pitch), рысканье (yaw), крен (roll)].
-
-        Returns:
-            Единичный вектор (numpy array) [x, y, z], представляющий направление "вверх".
-        """
+        """Глобальный вектор "вверх" дрона."""
         if rotate is None:
             rotate = self.drone.params.angle
-        pitch_rad = np.deg2rad(rotate[2])
-        yaw_rad = np.deg2rad(rotate[1])
-        roll_rad = np.deg2rad(rotate[0])
-
-        # Матрицы вращения вокруг осей X, Y и Z
-        Rx = np.array(
-            [
-                [1, 0, 0],
-                [0, np.cos(pitch_rad), -np.sin(pitch_rad)],
-                [0, np.sin(pitch_rad), np.cos(pitch_rad)],
-            ]
-        )
-
-        Ry = np.array(
-            [
-                [np.cos(yaw_rad), 0, np.sin(yaw_rad)],
-                [0, 1, 0],
-                [-np.sin(yaw_rad), 0, np.cos(yaw_rad)],
-            ]
-        )
-
-        Rz = np.array(
-            [
-                [np.cos(roll_rad), -np.sin(roll_rad), 0],
-                [np.sin(roll_rad), np.cos(roll_rad), 0],
-                [0, 0, 1],
-            ]
-        )
-        # Матрица вращения, представляющая ориентацию дрона (в мировых координатах)
-        # Порядок умножения матриц важен: сначала крен, затем тангаж, затем рысканье (ZYX)
-        R = Ry @ Rx @ Rz
-
-        up_local = np.array([0, 1, 0])
-
-        up_global = R @ up_local
-
-        return Vector(*up_global)
+        return self._rotate_local_to_global(Vector(0, 1, 0), rotate)
 
     def get_forwored_vec(self, rotate: list[float] | None = None) -> Vector:
         """
@@ -670,3 +742,42 @@ class DroneExecutor:
         right_local = np.array([0, 0, 1])
         right_global = R @ right_local
         return Vector(*right_global)
+
+    def _get_rotation_matrix(self, rotate: list[float]) -> np.ndarray:
+        """Матрица вращения ZYX из углов [roll, yaw, pitch] в градусах."""
+        roll_rad, yaw_rad, pitch_rad = map(np.deg2rad, rotate)  # [0], [1], [2]
+
+        Rx = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(pitch_rad), -np.sin(pitch_rad)],
+                [0, np.sin(pitch_rad), np.cos(pitch_rad)],
+            ]
+        )
+        Ry = np.array(
+            [
+                [np.cos(yaw_rad), 0, np.sin(yaw_rad)],
+                [0, 1, 0],
+                [-np.sin(yaw_rad), 0, np.cos(yaw_rad)],
+            ]
+        )
+        Rz = np.array(
+            [
+                [np.cos(roll_rad), -np.sin(roll_rad), 0],
+                [np.sin(roll_rad), np.cos(roll_rad), 0],
+                [0, 0, 1],
+            ]
+        )
+
+        # Порядок ZYX: v_global = Ry @ Rx @ Rz @ v_local
+        R = Ry @ Rx @ Rz
+        return R
+
+    def _rotate_local_to_global(
+        self, local_vector: Vector, rotate: list[float]
+    ) -> Vector:
+        """Вращает локальный вектор в глобальную систему координат."""
+        R = self._get_rotation_matrix(rotate)
+        local_np = np.array([local_vector.x, local_vector.y, local_vector.z])
+        global_np = R @ local_np
+        return Vector(x=global_np[0], y=global_np[1], z=global_np[2])
