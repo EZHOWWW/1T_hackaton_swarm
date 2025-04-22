@@ -74,7 +74,9 @@ class Simulation:
             self.set_drones([[0] * 8] * 5)
         if not self.can_get_drones_info:
             self.set_drones(self.last_engines)
-        res = json.loads(self.connection.receive_data())["dronesData"]
+        res = json.loads(self.connection.receive_data()).get("dronesData", None)
+        if not res:
+            return []
         self.last_drones_info = [parse_drone_data(i) for i in res]
         self.can_get_drones_info = False
 
