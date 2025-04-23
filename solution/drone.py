@@ -45,7 +45,7 @@ class GoOnPoints(Task):
             target.x * sgn_x <= cur_point.x * sgn_x
             # target.y * sgn_y > cur_point.y
             and target.z * sgn_z <= cur_point.z * sgn_z
-            or (target - cur_point).length() < 0.45
+            or (target - cur_point).length() <= 0.7
         ):
             self.current_point_index += 1
 
@@ -184,6 +184,13 @@ class Drone:
             print(
                 f"Drone: {self.params.id} (Pos: {self.params.possition}) assigned to fireplace index: {best_fp_index} at pos: {chosen_pos}, distance: {min_dist:.2f}"
             )
+            import os
+
+            with open("chosens.txt", "a") as f:
+                f.write(
+                    f"Drone: {self.params.id} (Pos: {self.params.possition}) assigned to fireplace index: {best_fp_index} at pos: {chosen_pos}, distance: {min_dist:.2f}\n"
+                )
+
             return chosen_pos
         else:
             # Свободных активных каминов нет

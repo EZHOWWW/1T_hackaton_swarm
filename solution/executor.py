@@ -190,9 +190,9 @@ class DroneExecutor:
         )
 
         pitch_yaw_pid_params = {
-            "Kp": 1.1,
+            "Kp": 1.3,
             "Ki": 1.1,
-            "Kd": 0.6,
+            "Kd": 0.5,
             "setpoint": 0.0,
             "integral_limits": None,
             "output_limits": (-1, +1),
