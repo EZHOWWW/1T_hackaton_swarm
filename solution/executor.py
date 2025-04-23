@@ -255,6 +255,7 @@ class DroneExecutor:
     ) -> list[float]:
         direction = self.drone.params.possition - target
         direction = Vector(x=direction.z, y=0, z=direction.x).normalize()
+        # direction = direction.normalize()
 
         target_height = self.correct_height(target, None, dt)
         engines = np.zeros(8)

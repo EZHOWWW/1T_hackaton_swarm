@@ -8,10 +8,15 @@ import time
 
 def get_point() -> dict[Vector, list[Vector]]:
     p = {
-        Vector(-72.35, 6.5, 92.83): [
-            Vector(-72.40, 6.5, 83.03),
-            Vector(-72.35, 6.8, 92.83),
-        ]
+        # Vector(-72.35, 6.5, 92.83): [
+        #     Vector(-72.40, 6.5, 83.03),
+        #     Vector(-72.35, 6.8, 92.83),
+        # ],
+        Vector(-27.18, 11, 75.11): [
+            Vector(-61.90, 11, 75.12),
+            Vector(-47.69, 11, 75.15),
+            Vector(-27.18, 11, 75.11),
+        ],
     }
     return p
 
