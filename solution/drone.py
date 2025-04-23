@@ -88,6 +88,9 @@ class Drone:
         self.params: DroneInfo = None
         self.engines: list[float] = [0.0] * 8
         self.need_drop: bool = False
+        
+        self.have_bomb: bool = True
+        self.is_dead = False
 
         # self.my_height = self.id * 3 + 14
         self.my_height = 12
@@ -95,9 +98,16 @@ class Drone:
 
     def update(self, dt: float):
         """now self.params and self.engines is actual"""
+        if self.is_dead:
+            return
         if self.need_drop:
+            self.have_bomb = False
             self.need_drop = False
         self.solve_task(self.task, dt)
+        
+        if not self.params.is_alive:
+            self.dead()
+            
         self.log()
 
     def solve_task(self, task: Task, dt: float):
@@ -204,6 +214,25 @@ class Drone:
             return self.swarm.get_fireplace_points(pos)
         return None
 
+    def dead(self):
+        self.is_dead = True
+        if isinstance(self.task, GoToFireplace):
+            self.swarm.fireplaces[self.task.fireplace_index][1] = -1
+            print(self.swarm.fireplaces)
+            print("\n\n\n\n\n")
+        print(f"DRONE {self.id} IS DEAD!")
+        print(f"{self.my_height=}")
+        print(f"{self.task.__name__=}")
+        try:
+            print(f"{self.task}")
+            print(f"{self.start_pos=}")
+            print(f"{self.points=}")
+            print(f"{self.current_point_index=}")
+            print(f"{self.params.position=}")
+            print(f"Dist: {(self.params.position - self.task.get_cur_point()).length()}")
+        except Exception as exc:
+            pass
+    
     def log(self):
         if self.params.is_alive:
             print("=" * 10 + f"DRONE: {self.params.id}" + "=" * 10)
