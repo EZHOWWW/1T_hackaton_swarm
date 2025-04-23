@@ -182,24 +182,24 @@ class DroneExecutor:
         self.drone = drone
         # --- Параметры управления ---
         self.altitude_pid = PIDController(
-            Kp=0.1,
-            Ki=0.6,
-            Kd=0.2,
+            Kp=0.3,
+            Ki=0.8,
+            Kd=0.4,
             setpoint=0,
-            output_limits=(0, 0.7),
+            output_limits=(0, 0.9),
         )
 
         pitch_yaw_pid_params = {
-            "Kp": 1.0,
+            "Kp": 1.1,
             "Ki": 1.1,
-            "Kd": 0.5,
+            "Kd": 0.6,
             "setpoint": 0.0,
             "integral_limits": None,
-            "output_limits": (-0.8, +0.8),
+            "output_limits": (-1, +1),
         }
 
         # - Максимальный угол наклона дрона (скорость) -
-        self.max_tilt_angle = 20
+        self.max_tilt_angle = 30
         # TODO best params
         # -----------
 
@@ -267,6 +267,7 @@ class DroneExecutor:
             target_height, self.drone.params.possition.y, dt
         )
 
+        print(direction, target_height)
         engines = np.clip(engines, 0, 1)
         return engines
 

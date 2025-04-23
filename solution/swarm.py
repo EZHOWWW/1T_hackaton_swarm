@@ -8,17 +8,137 @@ import time
 
 def get_point() -> dict[Vector, list[Vector]]:
     p = {
-        # Vector(-72.35, 6.5, 92.83): [
-        #     Vector(-72.40, 6.5, 83.03),
-        #     Vector(-72.35, 6.8, 92.83),
-        # ],
-        Vector(-27.18, 11, 75.11): [
-            Vector(-61.90, 11, 75.12),
-            Vector(-47.69, 11, 75.15),
-            Vector(-27.18, 11, 75.11),
+        Vector(-72.53, 0, 93.89): [  # 1 - 13 самая ближняя
+            Vector(-72.9, 3.00, 84.03),
+            Vector(-71.9, 3.00, 89.02),
+            Vector(-71.3, 3.00, 93.89),
+        ],
+        Vector(-70.81, 0.00, 100.86): [  # 2 - 4 2ая ближаня
+            Vector(-74.09, 8.50, 83.92),
+            Vector(-74.30, 8.00, 88.25),
+            Vector(-74.43, 8.50, 94.36),
+            Vector(-72.83, 8.50, 98.50),
+            Vector(-70.81, 8.50, 100.86),
+        ],
+        Vector(-69.93, 0.00, 113.52): [  # 3 - 7 3ая ближняя
+            Vector(-77.02, 9.60, 83.47),
+            Vector(-76.80, 9.60, 90.36),
+            Vector(-75.65, 9.60, 97.36),
+            Vector(-74.13, 9.60, 103.45),
+            Vector(-72.81, 9.60, 108.97),
+            Vector(-69.93, 9.60, 113.52),
+        ],
+        Vector(-60.32, 0.00, 113.95): [  # 4 - 3
+            Vector(-71.02, 12.00, 81.74),
+            Vector(-66.73, 12.00, 84.34),
+            Vector(-63.47, 12.00, 89.26),
+            Vector(-63.71, 12.00, 95.79),
+            Vector(-63.93, 12.00, 101.28),
+            Vector(-63.70, 12.00, 107.79),
+            Vector(-62.32, 12.00, 113.95),
+        ],
+        Vector(-34.17, 0.00, 101.55): [  # 5 - 0
+            Vector(-72.13, 6.00, 79.59),
+            Vector(-70.69, 6.00, 81.39),
+            Vector(-69.28, 6.00, 82.29),
+            Vector(-66.64, 6.00, 83.55),
+            Vector(-63.68, 6.00, 84.49),
+            Vector(-60.61, 6.00, 85.33),
+            Vector(-58.08, 6.00, 86.64),
+            Vector(-56.29, 6.00, 88.77),
+            Vector(-54.46, 6.00, 91.44),
+            Vector(-51.36, 6.00, 94.47),
+            Vector(-50.07, 6.00, 96.11),
+            Vector(-48.33, 6.00, 98.30),
+            Vector(-46.52, 6.00, 99.64),
+            Vector(-43.91, 6.00, 100.00),
+            Vector(-41.31, 6.00, 100.00),
+            Vector(-37.86, 6.00, 100.00),
+            Vector(-34.17, 6.00, 100.00),
+        ],
+        Vector(-24.3, 12.00, 99.83): [  # 6 -1
+            Vector(-71.97, 10.00, 79.44),
+            Vector(-67.55, 10.00, 81.44),
+            Vector(-61.66, 10.00, 82.53),
+            Vector(-57.31, 10.00, 83.36),
+            Vector(-54.30, 10.00, 86.06),
+            Vector(-51.66, 10.00, 89.13),
+            Vector(-49.59, 12.00, 92.23),
+            Vector(-46.57, 12.00, 96.17),
+            Vector(-43.13, 12.00, 98.25),
+            Vector(-37.52, 12.00, 98.53),
+            Vector(-32.76, 12.00, 99.21),
+            Vector(-27.00, 12.00, 99.50),
+            Vector(-24.3, 12.00, 99.83),
+        ],
+        Vector(-30.8, 0, 48): [  # 7 -2 Под мостом на полу
+            Vector(-71.14, 3.00, 68.59),
+            Vector(-64.98, 3.00, 68.39),
+            Vector(-56.01, 3.00, 67.57),
+            Vector(-50.08, 3.00, 57.41),
+            Vector(-47.10, 3.00, 53.25),
+            Vector(-46.10, 3.00, 50.55),
+            Vector(-30.8, 3.00, 49.34),
+            Vector(-30.8, 3.00, 48),
+        ],
+        Vector(-26.97, 0, 54.39): [  # 8 - 11 Под мостом на каробке
+            Vector(-69.63, 4.80, 68.87),
+            Vector(-62.78, 4.80, 68.66),
+            Vector(-52.41, 4.80, 69.68),
+            Vector(-43.89, 4.80, 71.11),
+            Vector(-36.27, 4.80, 71.38),
+            Vector(-26.75, 4.80, 71.11),
+            Vector(-14.69, 4.80, 70.90),
+            Vector(-9.16, 4.80, 65.10),
+            Vector(-8.78, 4.80, 51.31),
+            Vector(-26.97, 4.80, 54.0),
+        ],
+        Vector(-3.26, 0, 38.55): [  # 9 - 14 между коробками у моста
+            Vector(-71.90, 12.00, 58.59),
+            Vector(-49.52, 12.00, 49.84),
+            Vector(-19.48, 12.00, 39.06),
+            Vector(-5.56, 10.00, 38.8),
+            Vector(-3.26, 8, 38.55),
+        ],
+        Vector(19.9, 0, 51.29): [  # 10 - 6 Под мостом далеко
+            Vector(-71.90, 10.50, 68.59),
+            Vector(-19.48, 10.50, 69.06),
+            Vector(-10, 7, 60.06),
+            Vector(19.9, 7, 51.29),
+        ],
+        Vector(-26.36, 0, 24.28): [  # 11 - 10  После коробок пд мостом
+            Vector(-71.90, 15.00, 58.59),
+            Vector(-49.52, 15.00, 49.84),
+            Vector(-19.48, 15.00, 39.06),
+            Vector(-26.37, 10, 24.28),
         ],
     }
     return p
+
+
+"""
+[Fireplace(number=5, possition=Vector(41.43, 3, 66.17), active=False), -1], 
+[Fireplace(number=8, possition=Vector(-43.82, 0, 6.51), active=False), -1], 
+[Fireplace(number=9, possition=Vector(-47.44, 0, 11.34), active=False), -1], 
+[Fireplace(number=12, possition=Vector(-20.17, 0, -48.13), active=False), -1],
+
+
+[Fireplace(number=0, possition=Vector(-34.17, 3, 100.55), active=False), -1], 
+[Fireplace(number=1, possition=Vector(-24.3, 0, 99.83), active=False), -1], 
+[Fireplace(number=2, possition=Vector(-30.8, 0, 48), active=False), -1], 
+[Fireplace(number=3, possition=Vector(-60.32, 0, 113.95), active=False), -1], +
+[Fireplace(number=4, possition=Vector(-70.85, 0, 100.86), active=False), -1], +
+[Fireplace(number=5, possition=Vector(41.43, 3, 66.17), active=False), -1], 
+[Fireplace(number=6, possition=Vector(19.9, 0, 51.29), active=False), -1], 
+[Fireplace(number=7, possition=Vector(-69.93, 0, 113.52), active=False), -1],  +
+[Fireplace(number=8, possition=Vector(-43.82, 0, 6.51), active=False), -1], 
+[Fireplace(number=9, possition=Vector(-47.44, 0, 11.34), active=False), -1], 
+[Fireplace(number=10, possition=Vector(-26.37, 0, 24.28), active=False), -1], 
+[Fireplace(number=11, possition=Vector(-26.97, 2.99, 54.39), active=False), -1], 
+[Fireplace(number=12, possition=Vector(-20.17, 0, -48.13), active=False), -1],
+ [Fireplace(number=13, possition=Vector(-72.53, 0, 93.89), active=False), -1],  +
+ [Fireplace(number=14, possition=Vector(-3.26, 2, 38.55), active=False), -1]]
+"""
 
 
 class Swarm:
@@ -45,7 +165,7 @@ class Swarm:
             start = time.time()
             for u in self.units:
                 u.update(dt)
-                break
+                # break
             self.upload_drones_info()
             time.sleep(0.1)
 
@@ -106,7 +226,7 @@ class Swarm:
             else:
                 closest_x = min_x
 
-        return Vector(closest_x, closest_y, closest_z)
+        return Vector(closest_x, 4, closest_z)
 
     def upload_drones_info(self):
         eng_drones = [v.engines for i, v in enumerate(self.units)]
@@ -117,5 +237,9 @@ class Swarm:
     def get_fireplace_points(
         self, fireplace_pos: Vector
     ) -> tuple[Vector, list[Vector]]:
-        closest_key = min(self.points, key=lambda key: (key - fireplace_pos).length())
+        for k, v in self.points.items():
+            print(k, (k - fireplace_pos).length())
+        closest_key = min(
+            self.points, key=lambda key: (key - fireplace_pos).replace(y=0).length()
+        )
         return closest_key, self.points[closest_key]
