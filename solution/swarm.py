@@ -33,7 +33,6 @@ class Swarm:
             start = time.time()
             for u in self.units[:active_drones]:
                 u.update(dt)
-                break
             if (
                 time.time() - begin_time > active_drones * drone_activate_interval
                 and active_drones != 6

@@ -238,9 +238,9 @@ class DroneExecutor:
         self.max_tilt_angle = 12
 
         # - Параметры отталкивания дроннов (избежание сталкновений) -
-        self._safety_radius = 3  # Радиус безопасности use in self.correct_direction_from_other_drones, correct_direction_from_lidars
+        self._safety_radius = 6  # Радиус безопасности use in self.correct_direction_from_other_drones, correct_direction_from_lidars
         self._repulsion_strength = (
-            2  # Сила отталкивания use in self.correct_direction_from_other_drones
+            5  # Сила отталкивания use in self.correct_direction_from_other_drones
         )
 
         # - Параметры лидаров -
