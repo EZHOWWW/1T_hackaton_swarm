@@ -42,10 +42,10 @@ class ImageAnnotator:
         self.points_square = []
         self.points_fires = []
         self.world_coords_square = [
-            (-74.0, 78.0),
-            (-74.0, 72.0),
-            (-80.0, 72.0),
-            (-80.0, 78.0),
+            (-74.01, 78.31),
+            (-74.01, 72.31),
+            (-80.01, 72.31),
+            (-80.01, 78.31),
         ]
         self.current_point_type = "square"
         self.user_height = tk.DoubleVar(master, value=0.0)

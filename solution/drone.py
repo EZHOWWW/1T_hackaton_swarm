@@ -37,14 +37,15 @@ class GoOnPoints(Task):
             if self.current_point_index < 1
             else self.points[self.current_point_index - 1]
         )
-        sgn_x = 1 if (last_point - cur_point).x <= 0 else -1
+        sgn_x = -1 if (last_point - cur_point).x <= 0 else 1
         sgn_y = 1 if (last_point - cur_point).y <= 0 else -1
-        sgn_z = 1 if (last_point - cur_point).z <= 0 else -1
+        sgn_z = -1 if (last_point - cur_point).z <= 0 else 1
 
         if (
-            target.x * sgn_x > cur_point.x
+            target.x * sgn_x <= cur_point.x * sgn_x
             # target.y * sgn_y > cur_point.y
-            or target.z * sgn_z > cur_point.z
+            and target.z * sgn_z <= cur_point.z * sgn_z
+            or (target - cur_point).length() < 0.45
         ):
             self.current_point_index += 1
 
@@ -108,7 +109,6 @@ class Drone:
             else:
                 self.task = Sleep()
         if isinstance(self.task, GoToFireplaceOnPoints):
-            print("solve fireplace")
             self.go_to_fireplace_on_points(self.task, dt)
         if isinstance(self.task, GoToHomeOnPoints):
             self.go_to_home(self.task, dt)
@@ -159,7 +159,7 @@ class Drone:
 
         # Проверяем, находится ли точка в пределах всех границ
         is_in_x = min_x <= self.params.possition.x <= max_x
-        is_in_y = min_y <= self.params.possition.y <= max_y
+        is_in_y = self.params.possition.y <= 6
         is_in_z = min_z <= self.params.possition.z <= max_z
 
         return is_in_x and is_in_y and is_in_z
