@@ -217,7 +217,7 @@ class Drone:
 
     def dead(self):
         self.is_dead = True
-        with open("./logs/drone_dead_{self.id}_{time.time()}.txt", 'w') as f:
+        with open(f"./logs/drone_dead_{self.id}_{time.time()}.txt", 'w') as f:
             if isinstance(self.task, GoToFireplace):
                 self.swarm.fireplaces[self.task.fireplace_index][1] = -1
                 print(self.swarm.fireplaces, file=f)
