@@ -224,7 +224,7 @@ class Drone:
                 print("\n\n\n\n\n", file=f)
             print(f"DRONE {self.id} IS DEAD!", file=f)
             print(f"{self.my_height=}", file=f)
-            print(f"{self.task.__name__=}", file=f)
+            print(f"{self.task.__class__=}", file=f)
             try:
                 print(f"{self.task}", file=f)
                 print(f"{self.start_pos=}", file=f)
