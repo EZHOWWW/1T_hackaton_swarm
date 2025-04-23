@@ -20,18 +20,43 @@ class Sleep(Task):
 
 
 class GoOnPoints(Task):
-    def __init__(self, points: list[Vector]):
-        self.points = points
+    def __init__(self, start_pos: Vector, points: list[Vector], current_point_index=0):
+        self.start_pos = start_pos
+        self.points: list[Vector] = points
+        self.current_point_index = current_point_index
+
+    def get_cur_point(self) -> Vector:
+        return self.points[self.current_point_index]
+
+    def update_cur_point(self, target: Vector):
+        cur_point = self.get_cur_point()
+        if self.current_point_index == len(self.points) - 1:
+            return cur_point
+        last_point = (
+            self.start_pos
+            if self.current_point_index < 1
+            else self.points[self.current_point_index]
+        )
+        sgn_x = 1 if (last_point - cur_point).x <= 0 else -1
+        sgn_y = 1 if (last_point - cur_point).y <= 0 else -1
+        sgn_z = 1 if (last_point - cur_point).z <= 0 else -1
+
+        if (
+            target.x * sgn_x > cur_point.x
+            # target.y * sgn_y > cur_point.y
+            or target.z * sgn_z > cur_point.z
+        ):
+            self.current_point_index += 1
 
 
-class GoToFireplaceOnPoints(Task):
-    def __init__(self, points: list[Vector]):
-        super().__init__(points)
+class GoToFireplaceOnPoints(GoOnPoints):
+    def __init__(self, start_pos: Vector, points: list[Vector]):
+        super().__init__(start_pos, points)
 
 
-class GoToHomeOnPoints(Task):
-    def __init__(self, points: list[Vector]):
-        super().__init__(points)
+class GoToHomeOnPoints(GoOnPoints):
+    def __init__(self, start_pos: Vector, points: list[Vector]):
+        super().__init__(start_pos, points[::-1])
 
 
 class GoToTask(Task):
@@ -49,7 +74,7 @@ class GoToHome(GoToTask):
         super().__init__(home_pos)
 
 
-DISTANCE_TO_DROP = 1.7
+DISTANCE_TO_DROP = 1.5
 
 
 class Drone:
@@ -79,35 +104,42 @@ class Drone:
             points = self.find_fireplace_point(self.swarm.fireplaces)
 
             if points is not None:
-                self.task = GoToFireplaceOnPoints(points)
-                print(points, self.task)
+                self.task = GoToFireplaceOnPoints(self.params.possition, points[1])
             else:
                 self.task = Sleep()
-        if isinstance(self.task, GoToFireplace):
-            self.go_to_fireplace(self.task, dt)
-        if isinstance(self.task, GoToHome):
+        if isinstance(self.task, GoToFireplaceOnPoints):
+            print("solve fireplace")
+            self.go_to_fireplace_on_points(self.task, dt)
+        if isinstance(self.task, GoToHomeOnPoints):
             self.go_to_home(self.task, dt)
             if self.is_at_home():
                 self.task = FindFireplace()
 
-    def go_to_fireplace(self, fireplace_task: GoToFireplace, dt: float):
-        if (self.params.possition - fireplace_task.pos).replace(
-            y=0
-        ).length() <= DISTANCE_TO_DROP:
-            self.need_drop = True
-            self.task = GoToHome(self.swarm.get_home_pos(self.params.possition))
-        else:
-            self.go_to(fireplace_task, dt)
+    def go_to_fireplace_on_points(
+        self, fireplace_task: GoToFireplaceOnPoints, dt: float
+    ):
+        fireplace_task.update_cur_point(self.params.possition)
+        self.go_to_on_points(fireplace_task, dt)
+        if fireplace_task.current_point_index == len(fireplace_task.points) - 1:
+            if (self.params.possition - fireplace_task.get_cur_point()).replace(
+                y=0
+            ).length() < DISTANCE_TO_DROP:
+                self.need_drop = True
+                self.task = GoToHomeOnPoints(
+                    self.params.possition,
+                    [self.swarm.get_home_pos(self.params.possition)]
+                    + fireplace_task.points[: len(fireplace_task.points) - 1],
+                )
 
     def go_to_home(self, home_task: GoToHome, dt: float):
-        pos = home_task.pos
-        target_height = (
-            3 if (self.params.possition - pos).length() < 10 else self.my_height
-        )
-        self.engines = self.executor.move_to(pos, target_height, 1, dt)
+        home_task.update_cur_point(self.params.possition)
+        self.go_to_on_points(home_task, dt)
+        if self.is_at_home():
+            self.task = FindFireplace()
 
-    def go_to(self, go_to_task: GoToTask, dt: float):
-        pos = go_to_task.pos
+    def go_to_on_points(self, go_to_task: GoOnPoints, dt: float):
+        pos = go_to_task.get_cur_point()
+        print(pos, go_to_task.current_point_index)
         self.engines = self.executor.move_to(pos, self.my_height, 1, dt)
 
     def is_at_home(self) -> bool:
@@ -179,7 +211,9 @@ class Drone:
                     f"distance to target: {dist.length()} \t | x : {abs(dist.x)}, \t | y : {abs(dist.y)}"
                 )
             if isinstance(self.task, GoOnPoints):
-                print(f"GoOnpoints task: {self.task.points}")
+                print(
+                    f"{type(self.task)} task: {self.task.get_cur_point()} \t {self.task.points}"
+                )
             print(self.params)
             print(self.engines)
             print("\n\n")

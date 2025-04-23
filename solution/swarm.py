@@ -10,7 +10,7 @@ def get_point() -> dict[Vector, list[Vector]]:
     p = {
         Vector(-72.35, 6.5, 92.83): [
             Vector(-72.40, 6.5, 83.03),
-            Vector(-72.35, 6.5, 92.83),
+            Vector(-72.35, 6.8, 92.83),
         ]
     }
     return p
@@ -40,6 +40,7 @@ class Swarm:
             start = time.time()
             for u in self.units:
                 u.update(dt)
+                break
             self.upload_drones_info()
             time.sleep(0.1)
 
