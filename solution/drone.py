@@ -35,7 +35,7 @@ class GoOnPoints(Task):
         last_point = (
             self.start_pos
             if self.current_point_index < 1
-            else self.points[self.current_point_index]
+            else self.points[self.current_point_index - 1]
         )
         sgn_x = 1 if (last_point - cur_point).x <= 0 else -1
         sgn_y = 1 if (last_point - cur_point).y <= 0 else -1
