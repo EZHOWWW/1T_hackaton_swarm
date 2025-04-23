@@ -227,6 +227,7 @@ class Drone:
                 print("\n\n\n\n\n", file=f)
             print(f"DRONE {self.id} IS DEAD!", file=f)
             print(f"{self.my_height=}", file=f)
+<<<<<<< HEAD
             print(f"{self.task}", file=f)
             print(f"{self.task.start_pos=}", file=f)
             print(f"{self.task.points=}", file=f)
@@ -237,6 +238,19 @@ class Drone:
                 file=f,
             )
 
+=======
+            print(f"{self.task.__class__=}", file=f)
+            try:
+                print(f"{self.task}", file=f)
+                print(f"{self.start_pos=}", file=f)
+                print(f"{self.points=}", file=f)
+                print(f"{self.current_point_index=}", file=f)
+                print(f"{self.params.position=}", file=f)
+                print(f"Dist: {(self.params.position - self.task.get_cur_point()).length()}", file=f)
+            except Exception as exc:
+                pass
+    
+>>>>>>> 7a6422f (__class__)
     def log(self):
         if self.params.is_alive:
             print("=" * 10 + f"DRONE: {self.params.id}" + "=" * 10)
