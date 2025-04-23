@@ -5,6 +5,7 @@ from solution.simulation import Simulation, Fireplace, DroneInfo
 from abc import ABC
 from solution.geometry import Vector
 from solution.executor import DroneExecutor
+import time
 
 
 class Task(ABC):
@@ -216,22 +217,23 @@ class Drone:
 
     def dead(self):
         self.is_dead = True
-        if isinstance(self.task, GoToFireplace):
-            self.swarm.fireplaces[self.task.fireplace_index][1] = -1
-            print(self.swarm.fireplaces)
-            print("\n\n\n\n\n")
-        print(f"DRONE {self.id} IS DEAD!")
-        print(f"{self.my_height=}")
-        print(f"{self.task.__name__=}")
-        try:
-            print(f"{self.task}")
-            print(f"{self.start_pos=}")
-            print(f"{self.points=}")
-            print(f"{self.current_point_index=}")
-            print(f"{self.params.position=}")
-            print(f"Dist: {(self.params.position - self.task.get_cur_point()).length()}")
-        except Exception as exc:
-            pass
+        with open("./logs/drone_dead_{self.id}_{time.time()}.txt", 'w') as f:
+            if isinstance(self.task, GoToFireplace):
+                self.swarm.fireplaces[self.task.fireplace_index][1] = -1
+                print(self.swarm.fireplaces, file=f)
+                print("\n\n\n\n\n", file=f)
+            print(f"DRONE {self.id} IS DEAD!", file=f)
+            print(f"{self.my_height=}", file=f)
+            print(f"{self.task.__name__=}", file=f)
+            try:
+                print(f"{self.task}", file=f)
+                print(f"{self.start_pos=}", file=f)
+                print(f"{self.points=}", file=f)
+                print(f"{self.current_point_index=}", file=f)
+                print(f"{self.params.position=}", file=f)
+                print(f"Dist: {(self.params.position - self.task.get_cur_point()).length()}", file=f)
+            except Exception as exc:
+                pass
     
     def log(self):
         if self.params.is_alive:
