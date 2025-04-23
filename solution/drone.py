@@ -220,8 +220,13 @@ class Drone:
 
     def dead(self):
         self.is_dead = True
+<<<<<<< HEAD
         with open(f"./logs/drone_dead_{self.id}_{time.time()}.txt", "w") as f:
             if isinstance(self.task, GoToFireplaceOnPoints):
+=======
+        with open(f"./logs/drone_dead_{self.id}_{time.time()}.txt", 'w') as f:
+            if isinstance(self.task, GoToFireplace):
+>>>>>>> fae75ec (f)
                 self.swarm.fireplaces[self.task.fireplace_index][1] = -1
                 print(self.swarm.fireplaces, file=f)
                 print("\n\n\n\n\n", file=f)
