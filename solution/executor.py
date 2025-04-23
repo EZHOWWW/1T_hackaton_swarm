@@ -199,7 +199,7 @@ class DroneExecutor:
         }
 
         # - Максимальный угол наклона дрона (скорость) -
-        self.max_tilt_angle = 30
+        self.max_tilt_angle = 32
         # TODO best params
         # -----------
 

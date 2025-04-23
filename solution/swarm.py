@@ -106,9 +106,9 @@ def get_points() -> dict[Vector, list[Vector]]:
 
     def get_point_9():
         return {
-            Vector(-3.26, 0, 38.55): [  # 9 - 14  под мостом
-                Vector(-74.13, 10, 65),
-                Vector(-71.90, 10.00, 58.59),
+            Vector(-3.26, 0, 38.55): [  # 9 - 14  у моста между коробками
+                Vector(-74.13, 13, 65),
+                Vector(-71.90, 13.00, 58.59),
                 Vector(-49.52, 12.00, 49.84),
                 Vector(-19.48, 12.00, 39.06),
                 Vector(-5.56, 10.00, 38.8),
@@ -119,75 +119,91 @@ def get_points() -> dict[Vector, list[Vector]]:
     def get_point_10():
         return {
             Vector(19.9, 0, 51.29): [  # 10 - 6 Под мостом далеко
-                Vector(-71.90, 10.50, 68.59),
-                Vector(-19.48, 10.50, 69.06),
+                Vector(-71.90, 7, 68.59),
+                Vector(-19.48, 7, 69.06),
                 Vector(-10, 7, 60.06),
-                Vector(19.9, 7, 51.29),
+                Vector(18.7, 7, 51.29),
             ]
         }
 
     def get_point_11():
         return {
-            Vector(-26.36, 0, 24.28): [  # 11 - 10  После коробок пд мостом
+            Vector(-26.36, 0, 24.28): [  # 11 - 10
                 Vector(-71.90, 15.00, 58.59),
                 Vector(-49.52, 15.00, 49.84),
-                Vector(-19.48, 15.00, 39.06),
-                Vector(-26.37, 10, 24.28),
+                Vector(-30.48, 15.00, 39.06),
+                Vector(-26.37, 13, 24.28),
             ]
         }
 
     def get_point_12():
         return {
-            Vector(0, 0, 0): [  # Заглушка для точки 12
-                Vector(0, 0, 0),
+            Vector(-47.44, 0, 11.34): [
+                Vector(-68.55, 4.00, 70.46),
+                Vector(-57.86, 4.00, 68.47),
+                Vector(-54.09, 4.00, 50.52),
+                Vector(-51.63, 5.00, 26.25),
+                Vector(-47.44, 5, 11.34),
             ]
         }
 
     def get_point_13():
         return {
-            Vector(0, 0, 0): [  # Заглушка для точки 13
-                Vector(0, 0, 0),
+            Vector(-43.82, 0, 6.51): [
+                Vector(-68.55, 6.00, 70.46),
+                Vector(-57.86, 6.00, 68.47),
+                Vector(-54.09, 6.00, 50.52),
+                Vector(-51.63, 8.00, 26.25),
+                Vector(-43.82, 8, 6.51),
             ]
         }
 
     def get_point_14():
         return {
-            Vector(0, 0, 0): [  # Заглушка для точки 14
-                Vector(0, 0, 0),
+            Vector(41.43, 3, 66.17):  # Заглушка для точки 12
+            [
+                Vector(-73.56, 10.00, 80.39),
+                Vector(-44.53, 12.00, 78.24),
+                Vector(-12.54, 14.00, 78.60),
+                Vector(15.53, 14.00, 78.40),
+                Vector(40.15, 14.00, 75.73),
+                Vector(41.43, 12, 66.17),
             ]
         }
 
     def get_point_15():
         return {
-            Vector(0, 0, 0): [  # Заглушка для точки 15
-                Vector(0, 0, 0),
+            Vector(-20.17, 0, -48.13): [
+                Vector(-84.07, 13.00, 68.12),
+                Vector(-85.57, 13.00, 51.01),
+                Vector(-84.88, 13.00, 0.44),
+                Vector(-61.04, 7.00, 1.50),
+                Vector(-30.42, 7.00, -3.68),
+                Vector(-21.17, 7.00, -48.13),
             ]
         }
 
     p = {}
-    # p |= get_point_1()
-    # p |= get_point_2()
-    # p |= get_point_3()
-    # p |= get_point_4()
-    # p |= get_point_5()
-    # p |= get_point_6()
-    # p |= get_point_7()
-    # p |= get_point_8()
-    # p |= get_point_9()
+    p |= get_point_1()
+    p |= get_point_2()
+    p |= get_point_3()
+    p |= get_point_4()
+    p |= get_point_5()
+    p |= get_point_6()
+    p |= get_point_7()
+    p |= get_point_8()
+    p |= get_point_9()
     p |= get_point_10()
-    # p |= get_point_11()
-    # p |= get_point_12()
-    # p |= get_point_13()
-    # p |= get_point_14()
-    # p |= get_point_15()
+    p |= get_point_11()
+    p |= get_point_12()
+    p |= get_point_13()
+    p |= get_point_14()
+    p |= get_point_15()
     return p
 
 
 """
-[Fireplace(number=5, possition=Vector(41.43, 3, 66.17), active=False), -1], 
 [Fireplace(number=8, possition=Vector(-43.82, 0, 6.51), active=False), -1], 
-[Fireplace(number=9, possition=Vector(-47.44, 0, 11.34), active=False), -1], 
-[Fireplace(number=12, possition=Vector(-20.17, 0, -48.13), active=False), -1],
 
 
 [Fireplace(number=0, possition=Vector(-34.17, 3, 100.55), active=False), -1], 
@@ -232,7 +248,7 @@ class Swarm:
             start = time.time()
             for u in self.units:
                 u.update(dt)
-                break
+                # break
             self.upload_drones_info()
             time.sleep(0.1)
 
