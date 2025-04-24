@@ -66,10 +66,10 @@ def get_points() -> dict[Vector, list[Vector]]:
     def get_point_6():
         return {
             Vector(-24.3, 0.00, 99.83): [  # 6 - 1 слева верхняя
-                Vector(-67.93, 9.00, 82.84),
-                Vector(-57.18, 9.00, 83.03),
+                Vector(-67.93, 9.00, 75.84),
+                Vector(-57.18, 9.00, 75.03),
                 Vector(-50.13, 12.00, 96.99),
-                Vector(-30.13, 12.00, 97.55),
+                Vector(-30.13, 12.00, 96.55),
                 Vector(-24.3, 12.00, 99.83),
             ]
         }
@@ -186,21 +186,21 @@ def get_points() -> dict[Vector, list[Vector]]:
         }
 
     p = {}
-    p |= get_point_1()
-    p |= get_point_2()
-    p |= get_point_3()
-    p |= get_point_4()
-    p |= get_point_5()
+    # p |= get_point_1()
+    # p |= get_point_2()
+    # p |= get_point_3()
+    # p |= get_point_4()
+    # p |= get_point_5()
     p |= get_point_6()
-    p |= get_point_7()
-    p |= get_point_8()
-    p |= get_point_9()
-    p |= get_point_10()
-    p |= get_point_11()
-    p |= get_point_12()
-    p |= get_point_13()
-    p |= get_point_14()
-    p |= get_point_15()
+    # p |= get_point_7()
+    # p |= get_point_8()
+    # p |= get_point_9()
+    # p |= get_point_10()
+    # p |= get_point_11()
+    # p |= get_point_12()
+    # p |= get_point_13()
+    # p |= get_point_14()
+    # p |= get_point_15()
     return p
 
 
@@ -250,7 +250,7 @@ class Swarm:
             start = time.time()
             for u in self.units:
                 u.update(dt)
-                # break
+                break
             self.upload_drones_info()
             time.sleep(0.1)
 
