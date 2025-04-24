@@ -31,6 +31,7 @@ class SocketConnection(Connection):
         logging.info("Ждем запуска симулятора...")
 
         while not self.__websocket:
+            logging.debug(f"Connecting to game: {PORT=}")
             await asyncio.sleep(1)
         logging.info("Есть соединение с симулятором!")
 
