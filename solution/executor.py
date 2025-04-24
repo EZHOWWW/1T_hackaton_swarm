@@ -186,12 +186,12 @@ class DroneExecutor:
             Ki=0.8,
             Kd=0.4,
             setpoint=0,
-            output_limits=(0, 0.9),
+            output_limits=(0, 0.8),
         )
 
         pitch_yaw_pid_params = {
-            "Kp": 1.3,
-            "Ki": 1.1,
+            "Kp": 1.6,
+            "Ki": 1.3,
             "Kd": 0.5,
             "setpoint": 0.0,
             "integral_limits": None,
@@ -199,7 +199,7 @@ class DroneExecutor:
         }
 
         # - Максимальный угол наклона дрона (скорость) -
-        self.max_tilt_angle = 32
+        self.max_tilt_angle = 30
         # TODO best params
         # -----------
 

@@ -52,8 +52,9 @@ class GoOnPoints(Task):
 
 
 class GoToFireplaceOnPoints(GoOnPoints):
-    def __init__(self, start_pos: Vector, points: list[Vector]):
+    def __init__(self, start_pos: Vector, points: list[Vector], fireplace_index: int):
         super().__init__(start_pos, points)
+        self.fireplace_index = fireplace_index
 
 
 class GoToHomeOnPoints(GoOnPoints):
@@ -89,7 +90,7 @@ class Drone:
         self.params: DroneInfo = None
         self.engines: list[float] = [0.0] * 8
         self.need_drop: bool = False
-        
+
         self.have_bomb: bool = True
         self.is_dead = False
 
@@ -105,18 +106,18 @@ class Drone:
             self.have_bomb = False
             self.need_drop = False
         self.solve_task(self.task, dt)
-        
+
         if not self.params.is_alive:
             self.dead()
-            
+
         self.log()
 
     def solve_task(self, task: Task, dt: float):
         if isinstance(self.task, FindFireplace):
-            points = self.find_fireplace_point(self.swarm.fireplaces)
+            points, idx = self.find_fireplace_point(self.swarm.fireplaces)
 
             if points is not None:
-                self.task = GoToFireplaceOnPoints(self.params.possition, points[1])
+                self.task = GoToFireplaceOnPoints(self.params.possition, points[1], idx)
             else:
                 self.task = Sleep()
         if isinstance(self.task, GoToFireplaceOnPoints):
@@ -175,7 +176,9 @@ class Drone:
 
         return is_in_x and is_in_y and is_in_z
 
-    def find_fireplace(self, fireplaces: list[list[Fireplace, int]]) -> Vector | None:
+    def find_fireplace(
+        self, fireplaces: list[list[Fireplace, int]]
+    ) -> tuple[Vector, int]:
         """Ищет ближайший свободный и активный камин и назначает его себе."""
         best_fp_index = -1
         min_dist = float("inf")
@@ -202,39 +205,38 @@ class Drone:
                     f"Drone: {self.params.id} (Pos: {self.params.possition}) assigned to fireplace index: {best_fp_index} at pos: {chosen_pos}, distance: {min_dist:.2f}\n"
                 )
 
-            return chosen_pos
+            return chosen_pos, best_fp_index
         else:
             # Свободных активных каминов нет
-            return None
+            return None, None
 
     def find_fireplace_point(
         self, fireplaces: list[list[Fireplace, int]]
     ) -> tuple[Vector, list[Vector]] | None:
-        pos = self.find_fireplace(fireplaces)
+        pos, idx = self.find_fireplace(fireplaces)
         if pos is not None:
-            return self.swarm.get_fireplace_points(pos)
-        return None
+            return self.swarm.get_fireplace_points(pos), idx
+        return None, None
 
     def dead(self):
         self.is_dead = True
-        with open("./logs/drone_dead_{self.id}_{time.time()}.txt", 'w') as f:
-            if isinstance(self.task, GoToFireplace):
+        with open(f"./logs/drone_dead_{self.id}_{time.time()}.txt", "w") as f:
+            if isinstance(self.task, GoToFireplaceOnPoints):
                 self.swarm.fireplaces[self.task.fireplace_index][1] = -1
                 print(self.swarm.fireplaces, file=f)
                 print("\n\n\n\n\n", file=f)
             print(f"DRONE {self.id} IS DEAD!", file=f)
             print(f"{self.my_height=}", file=f)
-            print(f"{self.task.__name__=}", file=f)
-            try:
-                print(f"{self.task}", file=f)
-                print(f"{self.start_pos=}", file=f)
-                print(f"{self.points=}", file=f)
-                print(f"{self.current_point_index=}", file=f)
-                print(f"{self.params.position=}", file=f)
-                print(f"Dist: {(self.params.position - self.task.get_cur_point()).length()}", file=f)
-            except Exception as exc:
-                pass
-    
+            print(f"{self.task}", file=f)
+            print(f"{self.task.start_pos=}", file=f)
+            print(f"{self.task.points=}", file=f)
+            print(f"{self.task.current_point_index=}", file=f)
+            print(f"{self.params.possition=}", file=f)
+            print(
+                f"Dist: {(self.params.possition - self.task.get_cur_point()).length()}",
+                file=f,
+            )
+
     def log(self):
         if self.params.is_alive:
             print("=" * 10 + f"DRONE: {self.params.id}" + "=" * 10)
