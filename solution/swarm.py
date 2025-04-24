@@ -4,6 +4,7 @@ from solution.simulation import Simulation
 from solution.drone import Drone
 from solution.geometry import Vector
 import time
+<<<<<<< HEAD
 
 
 def get_points() -> dict[Vector, list[Vector]]:
@@ -224,6 +225,9 @@ def get_points() -> dict[Vector, list[Vector]]:
  [Fireplace(number=13, possition=Vector(-72.53, 0, 93.89), active=False), -1],  +
  [Fireplace(number=14, possition=Vector(-3.26, 2, 38.55), active=False), -1]]
 """
+=======
+from solution.points import get_points
+>>>>>>> fc79528 (finel commit)
 
 
 class Swarm:
@@ -250,7 +254,7 @@ class Swarm:
             start = time.time()
             for u in self.units:
                 u.update(dt)
-                break
+                # break
             self.upload_drones_info()
             time.sleep(0.1)
 
@@ -272,10 +276,10 @@ class Swarm:
 
     def get_home_pos(self, target: Vector) -> Vector:
         # Определяем вершины параллелепипеда
-        p1 = Vector(-74, 0, 78)
-        p2 = Vector(-74, 1000, 72)
-        p3 = Vector(-80, 1000, 72)
-        p4 = Vector(-80, 0, 78)
+        p1 = Vector(-74.5, 0, 77.6)
+        p2 = Vector(-74.5, 1000, 72.5)
+        p3 = Vector(-79.5, 1000, 72.5)
+        p4 = Vector(-79.5, 0, 77.6)
 
         # Параметры параллелепипеда
         min_x = min(p1.x, p2.x, p3.x, p4.x)
@@ -311,7 +315,7 @@ class Swarm:
             else:
                 closest_x = min_x
 
-        return Vector(closest_x, 4, closest_z)
+        return Vector(closest_x, 5, closest_z)
 
     def upload_drones_info(self):
         eng_drones = [v.engines for i, v in enumerate(self.units)]
