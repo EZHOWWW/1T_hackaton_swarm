@@ -115,7 +115,6 @@ class Drone:
     def solve_task(self, task: Task, dt: float):
         if isinstance(self.task, FindFireplace):
             points, idx = self.find_fireplace_point(self.swarm.fireplaces)
-
             if points is not None:
                 self.task = GoToFireplaceOnPoints(self.params.possition, points[1], idx)
             else:
@@ -220,59 +219,41 @@ class Drone:
 
     def dead(self):
         self.is_dead = True
-<<<<<<< HEAD
         with open(f"./logs/drone_dead_{self.id}_{time.time()}.txt", "w") as f:
             if isinstance(self.task, GoToFireplaceOnPoints):
-=======
-        with open(f"./logs/drone_dead_{self.id}_{time.time()}.txt", 'w') as f:
-            if isinstance(self.task, GoToFireplace):
->>>>>>> fae75ec842a276f40792f9e34bd5963764e66817
                 self.swarm.fireplaces[self.task.fireplace_index][1] = -1
                 print(self.swarm.fireplaces, file=f)
                 print("\n\n\n\n\n", file=f)
-            print(f"DRONE {self.id} IS DEAD!", file=f)
-            print(f"{self.my_height=}", file=f)
-<<<<<<< HEAD
-            print(f"{self.task}", file=f)
-            print(f"{self.task.start_pos=}", file=f)
-            print(f"{self.task.points=}", file=f)
-            print(f"{self.task.current_point_index=}", file=f)
-            print(f"{self.params.possition=}", file=f)
-            print(
-                f"Dist: {(self.params.possition - self.task.get_cur_point()).length()}",
-                file=f,
-            )
-
-=======
-            print(f"{self.task.__class__=}", file=f)
-            try:
+                print(f"DRONE {self.id} IS DEAD!", file=f)
+                print(f"{self.my_height=}", file=f)
                 print(f"{self.task}", file=f)
-                print(f"{self.start_pos=}", file=f)
-                print(f"{self.points=}", file=f)
-                print(f"{self.current_point_index=}", file=f)
-                print(f"{self.params.position=}", file=f)
-                print(f"Dist: {(self.params.position - self.task.get_cur_point()).length()}", file=f)
-            except Exception as exc:
-                pass
-    
->>>>>>> fae75ec842a276f40792f9e34bd5963764e66817
+                print(f"{self.task.start_pos=}", file=f)
+                print(f"{self.task.points=}", file=f)
+                print(f"{self.task.current_point_index=}", file=f)
+                print(f"{self.params.possition=}", file=f)
+                print(
+                    f"Dist: {(self.params.possition - self.task.get_cur_point()).length()}",
+                    file=f,
+                )
+
     def log(self):
-        if self.params.is_alive:
-            print("=" * 10 + f"DRONE: {self.params.id}" + "=" * 10)
-            if (
-                isinstance(self.task, GoToTask)
-                and self.task is not None
-                and self.params.possition is not None
-            ):
-                print(self.params.possition, type(self.task))
-                dist = self.params.possition - self.task.pos
-                print(
-                    f"distance to target: {dist.length()} \t | x : {abs(dist.x)}, \t | y : {abs(dist.y)}"
-                )
-            if isinstance(self.task, GoOnPoints):
-                print(
-                    f"{type(self.task)} task: {self.task.get_cur_point()} \t {self.task.points}"
-                )
-            print(self.params)
-            print(self.engines)
-            print("\n\n")
+        pass
+        # if self.params.is_alive:
+        #     print("=" * 10 + f"DRONE: {self.params.id}" + "=" * 10)
+        #     if (
+        #         isinstance(self.task, GoToTask)
+        #         and self.task is not None
+        #         and self.params.possition is not None
+        #     ):
+        #         print(self.params.possition, type(self.task))
+        #         dist = self.params.possition - self.task.pos
+        #         print(
+        #             f"distance to target: {dist.length()} \t | x : {abs(dist.x)}, \t | y : {abs(dist.y)}"
+        #         )
+        #     if isinstance(self.task, GoOnPoints):
+        #         print(
+        #             f"{type(self.task)} task: {self.task.get_cur_point()} \t {self.task.points}"
+        #         )
+        #     print(self.params)
+        #     print(self.engines)
+        #     print("\n\n")
