@@ -219,22 +219,14 @@ class Drone:
 
     def dead(self):
         self.is_dead = True
-        with open(f"./logs/drone_dead_{self.id}_{time.time()}.txt", "w") as f:
-            if isinstance(self.task, GoToFireplaceOnPoints):
-<<<<<<< HEAD
-=======
         with open(f"./logs/drone_dead_{self.id}_{time.time()}.txt", 'w') as f:
             if isinstance(self.task, GoToFireplace):
->>>>>>> fae75ec (f)
-=======
->>>>>>> fc79528 (finel commit)
                 self.swarm.fireplaces[self.task.fireplace_index][1] = -1
                 print(self.swarm.fireplaces, file=f)
                 print("\n\n\n\n\n", file=f)
                 print(f"DRONE {self.id} IS DEAD!", file=f)
                 print(f"{self.my_height=}", file=f)
                 print(f"{self.task}", file=f)
-<<<<<<< HEAD
                 print(f"{self.start_pos=}", file=f)
                 print(f"{self.points=}", file=f)
                 print(f"{self.current_point_index=}", file=f)
@@ -242,9 +234,6 @@ class Drone:
                 print(f"Dist: {(self.params.position - self.task.get_cur_point()).length()}", file=f)
             except Exception as exc:
                 pass
-    
->>>>>>> 7a6422f (__class__)
-=======
                 print(f"{self.task.start_pos=}", file=f)
                 print(f"{self.task.points=}", file=f)
                 print(f"{self.task.current_point_index=}", file=f)
@@ -254,7 +243,6 @@ class Drone:
                     file=f,
                 )
 
->>>>>>> fc79528 (finel commit)
     def log(self):
         pass
         # if self.params.is_alive:

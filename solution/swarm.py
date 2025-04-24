@@ -4,7 +4,6 @@ from solution.simulation import Simulation
 from solution.drone import Drone
 from solution.geometry import Vector
 import time
-<<<<<<< HEAD
 
 
 def get_points() -> dict[Vector, list[Vector]]:
@@ -225,9 +224,8 @@ def get_points() -> dict[Vector, list[Vector]]:
  [Fireplace(number=13, possition=Vector(-72.53, 0, 93.89), active=False), -1],  +
  [Fireplace(number=14, possition=Vector(-3.26, 2, 38.55), active=False), -1]]
 """
-=======
+
 from solution.points import get_points
->>>>>>> fc79528 (finel commit)
 
 
 class Swarm:

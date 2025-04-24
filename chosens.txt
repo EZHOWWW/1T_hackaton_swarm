@@ -461,3 +461,7 @@ Drone: 1 (Pos: Vector(-74.11593627929688, 3.40549898147583, 72.44862365722656)) 
 Drone: 0 (Pos: Vector(-74.19178009033203, 3.341609239578247, 73.20101928710938)) assigned to fireplace index: 6 at pos: Vector(19.9, 0, 51.29), distance: 96.67
 Drone: 0 (Pos: Vector(-77.01136779785156, 0.48246026039123535, 75.31169891357422)) assigned to fireplace index: 13 at pos: Vector(-72.53, 0, 93.89), distance: 19.12
 Drone: 0 (Pos: Vector(-77.00971221923828, 0.48244401812553406, 75.30046844482422)) assigned to fireplace index: 13 at pos: Vector(-72.53, 0, 93.89), distance: 19.13
+Drone: 0 (Pos: Vector(-77.01057434082031, 0.4825102686882019, 75.31181335449219)) assigned to fireplace index: 13 at pos: Vector(-72.53, 0, 93.89), distance: 19.12
+Drone: 0 (Pos: Vector(-77.01087951660156, 0.48244529962539673, 75.31227111816406)) assigned to fireplace index: 13 at pos: Vector(-72.53, 0, 93.89), distance: 19.12
+Drone: 0 (Pos: Vector(-77.0113296508789, 0.48253026604652405, 75.31183624267578)) assigned to fireplace index: 13 at pos: Vector(-72.53, 0, 93.89), distance: 19.12
+Drone: 0 (Pos: Vector(-77.01055145263672, 0.48245590925216675, 75.31145477294922)) assigned to fireplace index: 13 at pos: Vector(-72.53, 0, 93.89), distance: 19.12

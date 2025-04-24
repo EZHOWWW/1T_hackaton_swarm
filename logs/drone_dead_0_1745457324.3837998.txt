@@ -1,0 +1,8 @@
+DRONE 0 IS DEAD!
+self.my_height=12
+<solution.drone.GoToHomeOnPoints object at 0x7402b2a27d70>
+self.task.start_pos=Vector(-24.98259925842285, 11.999781608581543, 98.78263854980469)
+self.task.points=[Vector(-30.13, 12.0, 96.55), Vector(-50.13, 12.0, 96.99), Vector(-57.18, 9.0, 75.03), Vector(-67.93, 9.0, 75.84), Vector(-74.0, 4, 78.0)]
+self.task.current_point_index=1
+self.params.possition=Vector(-32.731834411621094, 12.00847339630127, 95.61312866210938)
+Dist: 17.452564634465663

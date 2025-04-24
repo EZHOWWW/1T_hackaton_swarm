@@ -1,12 +1,5 @@
 # 1T_hackaton_swarm
 
-<<<<<<< HEAD
-# How To Run
-
-```bash
-python main.py
-```
-=======
 # Ветки
 - points_solution: для 15 огней траектория просчитана, дроны летят по ней. Для неизвестных очагов летим А*
 - base_solution: базовое решение без просчитанных траекторий, с худшей физикой передвижения
@@ -55,5 +48,4 @@ python main.py
   ```bash
   uv run main.py
   ```
->>>>>>> 8e17bfe (README.md)
 
