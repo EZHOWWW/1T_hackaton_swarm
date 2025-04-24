@@ -19,7 +19,7 @@ def get_points() -> dict[Vector, list[Vector]]:
     def get_point_2():
         return {
             Vector(-70.81, 0.00, 100.86): [  # 2 - 4 2ая ближаня
-                Vector(-74.09, 8.50, 83.92),
+                Vector(-77.09, 8.50, 83.92),
                 Vector(-74.30, 8.00, 88.25),
                 Vector(-74.43, 8.50, 94.36),
                 Vector(-72.83, 8.50, 98.50),
@@ -99,8 +99,8 @@ def get_points() -> dict[Vector, list[Vector]]:
                 Vector(-26.75, 4.80, 71.11),
                 Vector(-14.69, 4.80, 70.90),
                 Vector(-9.16, 4.80, 63.10),
-                Vector(-8.78, 4.80, 50.31),
-                Vector(-26.0, 4.90, 53.0),
+                Vector(-9.16, 4.80, 51),
+                Vector(-26.97, 4.90, 54.39),
             ]
         }
 
@@ -129,6 +129,7 @@ def get_points() -> dict[Vector, list[Vector]]:
     def get_point_11():
         return {
             Vector(-26.36, 0, 24.28): [  # 11 - 10
+                Vector(-72.90, 14.00, 62.59),
                 Vector(-71.90, 15.00, 58.59),
                 Vector(-49.52, 15.00, 49.84),
                 Vector(-30.48, 15.00, 39.06),
@@ -139,7 +140,7 @@ def get_points() -> dict[Vector, list[Vector]]:
     def get_point_12():
         return {
             Vector(-47.44, 0, 11.34): [
-                Vector(-68.55, 4.00, 70.46),
+                Vector(-75.55, 4.00, 70.46),
                 Vector(-57.86, 4.00, 68.47),
                 Vector(-54.09, 4.00, 50.52),
                 Vector(-51.63, 5.00, 26.25),
@@ -150,10 +151,11 @@ def get_points() -> dict[Vector, list[Vector]]:
     def get_point_13():
         return {
             Vector(-43.82, 0, 6.51): [
-                Vector(-68.55, 6.00, 70.46),
+                Vector(-71.55, 6.00, 68.46),
                 Vector(-57.86, 6.00, 68.47),
-                Vector(-54.09, 6.00, 50.52),
-                Vector(-51.63, 8.00, 26.25),
+                Vector(-56.09, 6.00, 50.52),
+                Vector(-55.09, 6.00, 35.52),
+                Vector(-54.63, 7.00, 26.25),
                 Vector(-43.82, 8, 6.51),
             ]
         }
